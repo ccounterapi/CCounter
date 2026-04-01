@@ -569,8 +569,10 @@ private fun CCounterApp(
         if (!isInternetAvailable) return@LaunchedEffect
         viewModel.refreshRemotePolicy(force = true)
         while (isInternetAvailable) {
-            delay(60_000)
-            viewModel.refreshRemotePolicy(force = false)
+            val delayMs = if (viewModel.isAccessAllowed) 60_000L else 10_000L
+            delay(delayMs)
+            val forceSync = !viewModel.isAccessAllowed
+            viewModel.refreshRemotePolicy(force = forceSync)
         }
     }
 

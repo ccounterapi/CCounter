@@ -28,6 +28,16 @@ object RemotePolicyService {
         .writeTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    private fun withGithubAuth(builder: Request.Builder): Request.Builder {
+        val token = BuildConfig.GITHUB_REGISTRATION_TOKEN.trim()
+        if (token.isNotBlank()) {
+            builder.addHeader("Authorization", "Bearer $token")
+        }
+        builder.addHeader("Accept", "application/vnd.github+json")
+        builder.addHeader("User-Agent", "CCounter-App")
+        return builder
+    }
+
     @Serializable
     private data class DeviceRegistry(
         @SerialName("openAiApiKeyBase63NoZ") val openAiApiKeyBase63NoZ: String = "",
@@ -57,10 +67,11 @@ object RemotePolicyService {
 
     suspend fun fetchNetworkUtcNowMillis(): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
-            val request = Request.Builder()
+            val request = withGithubAuth(
+                Request.Builder()
                 .url("https://api.github.com/zen")
                 .get()
-                .build()
+            ).build()
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
@@ -221,11 +232,11 @@ object RemotePolicyService {
                 error("GitHub repository is not configured.")
             }
             val contentUrl = "https://api.github.com/repos/$owner/$repo/contents/admin/devices.json?ref=main&_ts=$nowUtcMillis"
-            val request = Request.Builder()
+            val request = withGithubAuth(
+                Request.Builder()
                 .url(contentUrl)
-                .addHeader("Accept", "application/vnd.github+json")
                 .get()
-                .build()
+            ).build()
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {

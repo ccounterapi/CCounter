@@ -136,7 +136,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 updateQuotaInfo(nowUtcMillis = nowUtcMillis, usage = normalizedUsage)
 
                 val recentlyChecked = nowUtcMillis - appData.deviceAccess.lastCheckedUtcMillis < ACCESS_SYNC_MIN_INTERVAL_MS
-                if (!force && recentlyChecked) {
+                if (!force && recentlyChecked && isAccessAllowed) {
                     applyAccessState(appData.deviceAccess, nowUtcMillis)
                     return@launch
                 }
