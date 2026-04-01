@@ -1,5 +1,5 @@
 {
-  "updatedAtUtc": "2026-04-01T18:48:03.060Z",
+  "updatedAtUtc": "2026-04-01T18:48:24.075Z",
   "openAiApiKeyBase63NoZ": "",
   "devices": [
     {
@@ -10,17 +10,17 @@
       "paused": true,
       "expiresAtUtc": "2026-05-01T18:33:46.149Z",
       "createdAtUtc": "2026-04-01T18:33:46.149Z",
-      "updatedAtUtc": "2026-04-01T18:48:03.060Z"
+      "updatedAtUtc": "2026-04-01T18:48:24.076Z"
     },
     {
       "deviceId": "56a17bef-5dae-4102-9b8e-0c9b47934328",
       "profileName": "DenverSvift",
       "language": "Русский",
       "accessEnabled": true,
-      "paused": true,
+      "paused": false,
       "expiresAtUtc": "2026-05-01T18:45:47.078Z",
       "createdAtUtc": "2026-04-01T18:45:47.078Z",
-      "updatedAtUtc": "2026-04-01T18:48:03.060Z"
+      "updatedAtUtc": "2026-04-01T18:48:24.076Z"
     }
   ]
 }
