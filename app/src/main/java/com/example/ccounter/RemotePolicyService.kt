@@ -79,8 +79,9 @@ object RemotePolicyService {
             val nowUtcMillis = fetchNetworkUtcNowMillis()
                 .getOrElse { throw it }
 
-            val url = BuildConfig.ACCESS_CONTROL_URL
-            if (url.isBlank()) error("Access control URL is not configured.")
+            val baseUrl = BuildConfig.ACCESS_CONTROL_URL
+            if (baseUrl.isBlank()) error("Access control URL is not configured.")
+            val url = appendCacheBust(baseUrl, nowUtcMillis)
 
             val request = Request.Builder()
                 .url(url)
@@ -219,5 +220,10 @@ object RemotePolicyService {
         val value = raw?.trim().orEmpty()
         if (value.isBlank()) return null
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+    }
+
+    private fun appendCacheBust(url: String, stamp: Long): String {
+        val separator = if (url.contains("?")) "&" else "?"
+        return "$url${separator}_ts=$stamp"
     }
 }
