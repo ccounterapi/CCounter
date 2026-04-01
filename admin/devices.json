@@ -1,16 +1,16 @@
 {
-  "updatedAtUtc": "2026-04-01T18:33:55.486Z",
+  "updatedAtUtc": "2026-04-01T18:34:03.284Z",
   "openAiApiKeyBase63NoZ": "",
   "devices": [
     {
       "deviceId": "98ca4444-b2dd-43a0-adc3-fdddcc9fb2fa",
       "profileName": "BrayanMist",
       "language": "Русский",
-      "accessEnabled": true,
-      "paused": false,
+      "accessEnabled": false,
+      "paused": true,
       "expiresAtUtc": "2026-05-01T18:33:46.149Z",
       "createdAtUtc": "2026-04-01T18:33:46.149Z",
-      "updatedAtUtc": "2026-04-01T18:33:55.486Z"
+      "updatedAtUtc": "2026-04-01T18:34:03.284Z"
     }
   ]
 }
