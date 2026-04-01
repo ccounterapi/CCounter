@@ -15,6 +15,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 object RemotePolicyService {
@@ -79,22 +80,7 @@ object RemotePolicyService {
             val nowUtcMillis = fetchNetworkUtcNowMillis()
                 .getOrElse { throw it }
 
-            val baseUrl = BuildConfig.ACCESS_CONTROL_URL
-            if (baseUrl.isBlank()) error("Access control URL is not configured.")
-            val url = appendCacheBust(baseUrl, nowUtcMillis)
-
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Cache-Control", "no-cache")
-                .get()
-                .build()
-
-            val bodyText = client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    error("Failed to fetch access list. HTTP ${response.code}")
-                }
-                response.body?.string().orEmpty()
-            }
+            val bodyText = fetchRegistryJson(nowUtcMillis)
 
             val registry = json.decodeFromString<DeviceRegistry>(bodyText)
             val record = registry.devices.firstOrNull { it.deviceId.equals(deviceId, ignoreCase = true) }
@@ -225,5 +211,55 @@ object RemotePolicyService {
     private fun appendCacheBust(url: String, stamp: Long): String {
         val separator = if (url.contains("?")) "&" else "?"
         return "$url${separator}_ts=$stamp"
+    }
+
+    private fun fetchRegistryJson(nowUtcMillis: Long): String {
+        val owner = BuildConfig.GITHUB_REPO_OWNER.trim()
+        val repo = BuildConfig.GITHUB_REPO_NAME.trim()
+        val fromApi = runCatching {
+            if (owner.isBlank() || repo.isBlank()) {
+                error("GitHub repository is not configured.")
+            }
+            val contentUrl = "https://api.github.com/repos/$owner/$repo/contents/admin/devices.json?ref=main&_ts=$nowUtcMillis"
+            val request = Request.Builder()
+                .url(contentUrl)
+                .addHeader("Accept", "application/vnd.github+json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    error("Failed to fetch access list from GitHub API. HTTP ${response.code}")
+                }
+                val raw = response.body?.string().orEmpty()
+                val parsed = JSONObject(raw)
+                val base64Content = parsed.optString("content")
+                    .replace("\n", "")
+                    .replace("\r", "")
+                if (base64Content.isBlank()) {
+                    error("GitHub API returned empty devices.json content.")
+                }
+                String(Base64.getDecoder().decode(base64Content), Charsets.UTF_8)
+            }
+        }.getOrNull()
+        if (!fromApi.isNullOrBlank()) {
+            return fromApi
+        }
+
+        val baseUrl = BuildConfig.ACCESS_CONTROL_URL
+        if (baseUrl.isBlank()) error("Access control URL is not configured.")
+        val url = appendCacheBust(baseUrl, nowUtcMillis)
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Cache-Control", "no-cache")
+            .get()
+            .build()
+
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                error("Failed to fetch access list. HTTP ${response.code}")
+            }
+            response.body?.string().orEmpty()
+        }
     }
 }
