@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CCounter Admin Panel</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="top">
+      <h1>CCounter Admin</h1>
+      <p>Device access control panel (GitHub Pages)</p>
+    </header>
+
+    <section class="card">
+      <h2>Connection</h2>
+      <div class="grid two">
+        <label>
+          GitHub token
+          <input id="tokenInput" type="password" placeholder="ghp_..." />
+        </label>
+        <label>
+          Branch
+          <input id="branchInput" type="text" value="main" />
+        </label>
+      </div>
+      <div class="grid three">
+        <label>
+          Owner
+          <input id="ownerInput" type="text" value="ccounterapi" />
+        </label>
+        <label>
+          Repo
+          <input id="repoInput" type="text" value="CCounter" />
+        </label>
+        <label>
+          JSON path
+          <input id="pathInput" type="text" value="admin/devices.json" />
+        </label>
+      </div>
+      <div class="actions">
+        <button id="loadBtn" class="btn">Load</button>
+        <button id="saveBtn" class="btn btn-primary">Save Changes</button>
+      </div>
+      <p id="statusText" class="muted"></p>
+    </section>
+
+    <section class="card">
+      <h2>Pending Registrations</h2>
+      <p class="muted">These come from app registration issues with label <code>device-registration</code>.</p>
+      <div id="pendingWrap"></div>
+    </section>
+
+    <section class="card">
+      <h2>Devices</h2>
+      <p class="muted">Enable access, pause usage, and edit expiration date/time.</p>
+      <div id="devicesWrap"></div>
+    </section>
+  </main>
+
+  <script src="./panel.js"></script>
+</body>
+</html>
+
