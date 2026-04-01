@@ -200,8 +200,15 @@
   }
 
   async function fetchContentMetadata(owner, repo, branch, path) {
-    const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
-    const contentResp = await fetch(contentUrl, { headers: ghHeaders() });
+    const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}&_ts=${Date.now()}-${Math.random()}`;
+    const contentResp = await fetch(contentUrl, {
+      headers: {
+        ...ghHeaders(),
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        "Pragma": "no-cache",
+      },
+      cache: "no-store",
+    });
     if (!contentResp.ok) throw new Error(`Failed to load devices JSON (${contentResp.status}).`);
     return contentResp.json();
   }
@@ -463,6 +470,7 @@
           const text = await resp.text();
           const error = new Error(`Save failed (${resp.status}): ${text}`);
           error.statusCode = resp.status;
+          error.responseText = text;
           throw error;
         }
       };
@@ -487,9 +495,28 @@
           return;
         } catch (error) {
           lastError = error;
-          if (!(error && error.statusCode === 409)) {
+          const isConflict = error && error.statusCode === 409;
+          if (!isConflict) {
             throw error;
           }
+
+          // GitHub returns expected SHA inside 409 message:
+          // "... does not match <sha>"
+          const conflictShaMatch = String(error.responseText || "")
+            .match(/does not match\s+([0-9a-f]{40})/i);
+          const conflictSha = conflictShaMatch ? conflictShaMatch[1] : "";
+          if (conflictSha) {
+            body.sha = conflictSha;
+            try {
+              await saveRequest();
+              setStatus("Saved successfully. Conflict resolved automatically.", false);
+              await loadAll();
+              return;
+            } catch (retryError) {
+              lastError = retryError;
+            }
+          }
+
           if (attempt < maxAttempts) {
             await sleep(120 * attempt);
             continue;
