@@ -281,6 +281,7 @@
         <td>
           <div class="row-actions">
             <button class="btn btn-primary" data-approve="${idx}">Approve (30 days)</button>
+            <button class="btn btn-danger" data-delete-pending="${idx}">Delete</button>
           </div>
         </td>
       </tr>
@@ -305,6 +306,12 @@
       btn.addEventListener("click", () => {
         const index = Number(btn.getAttribute("data-approve"));
         approvePending(index);
+      });
+    });
+    Array.from(pendingWrap.querySelectorAll("[data-delete-pending]")).forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const index = Number(btn.getAttribute("data-delete-pending"));
+        await deletePending(index);
       });
     });
   }
@@ -423,6 +430,42 @@
     state.pending.splice(index, 1);
     renderPending();
     renderDevices();
+  }
+
+  async function closeRegistrationIssue(issueNumber) {
+    const { owner, repo } = getRepoParts();
+    const url = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`;
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: ghHeaders(true),
+      body: JSON.stringify({ state: "closed" }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to close issue #${issueNumber} (${response.status}): ${text}`);
+    }
+  }
+
+  async function deletePending(index) {
+    const item = state.pending[index];
+    if (!item) return;
+    const label = item.profileName || item.deviceId || `#${item.issueNumber}`;
+    const confirmed = window.confirm(`Delete pending registration for ${label}?`);
+    if (!confirmed) return;
+    try {
+      setStatus(`Deleting pending request #${item.issueNumber}...`, false);
+      await closeRegistrationIssue(item.issueNumber);
+      state.pending.splice(index, 1);
+      renderPending();
+      setStatus(`Pending request #${item.issueNumber} deleted.`, false);
+    } catch (error) {
+      const message = (error && error.message) ? String(error.message) : String(error);
+      if (/failed to fetch/i.test(message)) {
+        setStatus("Failed to fetch. Check internet/VPN/adblock and ensure token has repository access.", true);
+      } else {
+        setStatus(message, true);
+      }
+    }
   }
 
   async function saveAll() {
