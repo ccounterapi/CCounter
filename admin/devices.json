@@ -1,6 +1,6 @@
 {
-  "updatedAtUtc": "2026-04-01T18:48:24.075Z",
-  "openAiApiKeyBase63NoZ": "",
+  "updatedAtUtc": "2026-04-01T18:49:22.172Z",
+  "openAiApiKeyBase63NoZ": "DibYR0Cm3YJ1Qp4/U6k1nkVXF61dKDJQvGkGoxGk6yX5Ad6I+TUsd1Bwo3wqrqkfmbu5gPcCTxvO+l3N1Re7G4lwe/rfEjfOhnkJ8mHanlg7furqbJchCk9gvQnRS6OFfDsdHknm+hH7uCdAv8rGovXUbDguxH4dnaOpIRxRYriVu5yeqM+Gsx3y+DOo3mAYFjn0xjXa4Lk97qKTPRQDh6x+y41c",
   "devices": [
     {
       "deviceId": "98ca4444-b2dd-43a0-adc3-fdddcc9fb2fa",
@@ -10,7 +10,7 @@
       "paused": true,
       "expiresAtUtc": "2026-05-01T18:33:46.149Z",
       "createdAtUtc": "2026-04-01T18:33:46.149Z",
-      "updatedAtUtc": "2026-04-01T18:48:24.076Z"
+      "updatedAtUtc": "2026-04-01T18:49:22.183Z"
     },
     {
       "deviceId": "56a17bef-5dae-4102-9b8e-0c9b47934328",
@@ -20,7 +20,7 @@
       "paused": false,
       "expiresAtUtc": "2026-05-01T18:45:47.078Z",
       "createdAtUtc": "2026-04-01T18:45:47.078Z",
-      "updatedAtUtc": "2026-04-01T18:48:24.076Z"
+      "updatedAtUtc": "2026-04-01T18:49:22.183Z"
     }
   ]
 }
