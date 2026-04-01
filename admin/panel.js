@@ -195,6 +195,10 @@
     return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function fetchContentMetadata(owner, repo, branch, path) {
     const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
     const contentResp = await fetch(contentUrl, { headers: ghHeaders() });
@@ -422,7 +426,6 @@
       setStatus("Saving...", false);
       const token = tokenInput.value.trim();
       if (!token) throw new Error("Enter GitHub token first.");
-      if (!state.sha) throw new Error("Load data before saving.");
 
       const { owner, repo, branch, path } = getRepoParts();
       const payloadObject = {
@@ -444,7 +447,7 @@
       const body = {
         message: `admin: update device access (${new Date().toISOString()})`,
         content: encoded,
-        sha: state.sha,
+        sha: "",
         branch,
       };
 
@@ -455,6 +458,7 @@
           headers: ghHeaders(),
           body: JSON.stringify(body),
         });
+        if (resp.ok) return;
         if (!resp.ok) {
           const text = await resp.text();
           const error = new Error(`Save failed (${resp.status}): ${text}`);
@@ -463,23 +467,36 @@
         }
       };
 
-      try {
-        await saveRequest();
-      } catch (error) {
-        if (error && error.statusCode === 409) {
+      const maxAttempts = 5;
+      let lastError = null;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
           const latest = await fetchContentMetadata(owner, repo, branch, path);
           state.sha = latest.sha || "";
+          if (!state.sha) {
+            throw new Error("Unable to get latest file SHA.");
+          }
           body.sha = state.sha;
           await saveRequest();
-          setStatus("Saved successfully. Conflict resolved automatically.", false);
+          if (attempt > 1) {
+            setStatus("Saved successfully. Conflict resolved automatically.", false);
+          } else {
+            setStatus("Saved successfully.", false);
+          }
           await loadAll();
           return;
+        } catch (error) {
+          lastError = error;
+          if (!(error && error.statusCode === 409)) {
+            throw error;
+          }
+          if (attempt < maxAttempts) {
+            await sleep(120 * attempt);
+            continue;
+          }
         }
-        throw error;
       }
-
-      setStatus("Saved successfully.", false);
-      await loadAll();
+      throw lastError || new Error("Save failed due to repeated SHA conflicts. Please try again.");
     } catch (error) {
       setStatus(error.message || String(error), true);
     }
