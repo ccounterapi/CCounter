@@ -120,6 +120,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextLayoutResult
@@ -147,6 +148,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -542,6 +545,7 @@ private fun CCounterApp(
     val swipeRoutes = listOf(Routes.Home, Routes.Stats, Routes.Weight, Routes.Profile)
     val startRoute = if (appData.onboardingCompleted) Routes.Home else Routes.Landing
     val isInternetAvailable by rememberInternetAvailableState()
+    val lifecycleOwner = LocalLifecycleOwner.current
     var dragAccum by remember(currentRoute) { mutableFloatStateOf(0f) }
     val appLocale = remember(appData.language) { localeForLanguage(appData.language) }
 
@@ -566,13 +570,27 @@ private fun CCounterApp(
     }
 
     LaunchedEffect(isInternetAvailable, appData.onboardingCompleted, appData.deviceId) {
-        if (!isInternetAvailable) return@LaunchedEffect
-        viewModel.refreshRemotePolicy(force = true)
+        if (!isInternetAvailable || !appData.onboardingCompleted) return@LaunchedEffect
         while (isInternetAvailable) {
-            val delayMs = if (viewModel.isAccessAllowed) 60_000L else 10_000L
-            delay(delayMs)
-            val forceSync = !viewModel.isAccessAllowed
-            viewModel.refreshRemotePolicy(force = forceSync)
+            // Keep access policy fresh so admin revocation is applied without re-login.
+            viewModel.refreshRemotePolicy(force = true)
+            delay(8_000L)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, isInternetAvailable, appData.onboardingCompleted) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                isInternetAvailable &&
+                appData.onboardingCompleted
+            ) {
+                viewModel.refreshRemotePolicy(force = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

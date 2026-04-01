@@ -64,6 +64,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     private var sessionOpenAiApiKey by mutableStateOf("")
+    private var queuedForcePolicySync = false
 
     private fun l(en: String, ru: String, uk: String): String = tr(appData.language, en, ru, uk)
 
@@ -122,7 +123,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sessionOpenAiApiKey = ""
             return
         }
-        if (isSyncingPolicy) return
+        if (isSyncingPolicy) {
+            if (force) {
+                queuedForcePolicySync = true
+            }
+            return
+        }
 
         viewModelScope.launch {
             isSyncingPolicy = true
@@ -174,6 +180,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             } finally {
                 isSyncingPolicy = false
+                if (queuedForcePolicySync) {
+                    queuedForcePolicySync = false
+                    refreshRemotePolicy(force = true)
+                }
             }
         }
     }
