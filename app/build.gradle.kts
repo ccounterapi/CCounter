@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+val localProps = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { stream -> load(stream) }
+    }
 }
 
 android {
@@ -20,7 +29,12 @@ android {
         val accessControlUrl = "https://raw.githubusercontent.com/ccounterapi/CCounter/main/admin/devices.json"
         val githubRepoOwner = "ccounterapi"
         val githubRepoName = "CCounter"
-        val registrationToken = ((project.findProperty("ccounter.githubRegistrationToken") as String?) ?: "")
+        val registrationToken = (
+            (project.findProperty("ccounter.githubRegistrationToken") as String?)
+                ?: localProps.getProperty("ccounter.githubRegistrationToken")
+                ?: System.getenv("CCOUNTER_GITHUB_REGISTRATION_TOKEN")
+                ?: ""
+            )
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
 
