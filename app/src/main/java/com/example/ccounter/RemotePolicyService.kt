@@ -51,6 +51,7 @@ object RemotePolicyService {
         val message: String,
         val checkedAtUtcMillis: Long,
         val openAiApiKeyBase63NoZ: String,
+        val hasDeviceRecord: Boolean,
     )
 
     suspend fun fetchNetworkUtcNowMillis(): Result<Long> = withContext(Dispatchers.IO) {
@@ -104,6 +105,7 @@ object RemotePolicyService {
                     message = "Device is pending approval in admin panel.",
                     checkedAtUtcMillis = nowUtcMillis,
                     openAiApiKeyBase63NoZ = registry.openAiApiKeyBase63NoZ.trim(),
+                    hasDeviceRecord = false,
                 )
             }
 
@@ -136,6 +138,7 @@ object RemotePolicyService {
                 message = message,
                 checkedAtUtcMillis = nowUtcMillis,
                 openAiApiKeyBase63NoZ = registry.openAiApiKeyBase63NoZ.trim(),
+                hasDeviceRecord = true,
             )
         }
     }

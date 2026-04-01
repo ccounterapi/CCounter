@@ -135,18 +135,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 updateQuotaInfo(nowUtcMillis = nowUtcMillis, usage = normalizedUsage)
 
-                if (!appData.registrationSubmitted) {
-                    val submitted = RemotePolicyService.submitDeviceRegistration(
-                        deviceId = appData.deviceId,
-                        profileName = appData.profile.name,
-                        language = appData.language,
-                    )
-                    if (submitted.isSuccess) {
-                        appData = appData.copy(registrationSubmitted = true)
-                        persist()
-                    }
-                }
-
                 val recentlyChecked = nowUtcMillis - appData.deviceAccess.lastCheckedUtcMillis < ACCESS_SYNC_MIN_INTERVAL_MS
                 if (!force && recentlyChecked) {
                     applyAccessState(appData.deviceAccess, nowUtcMillis)
@@ -154,6 +142,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val decision = RemotePolicyService.fetchAccessDecision(appData.deviceId).getOrElse { throw it }
+                var registrationSubmitted = decision.hasDeviceRecord
+                if (!decision.hasDeviceRecord) {
+                    val submitted = RemotePolicyService.submitDeviceRegistration(
+                        deviceId = appData.deviceId,
+                        profileName = appData.profile.name,
+                        language = appData.language,
+                    )
+                    registrationSubmitted = submitted.isSuccess
+                }
                 val updatedAccess = DeviceAccessState(
                     status = decision.status,
                     expiresAtUtcMillis = decision.expiresAtUtcMillis,
@@ -161,7 +158,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     message = decision.message,
                 )
                 sessionOpenAiApiKey = decodeBase63NoZ(decision.openAiApiKeyBase63NoZ).orEmpty()
-                appData = appData.copy(deviceAccess = updatedAccess)
+                appData = appData.copy(
+                    deviceAccess = updatedAccess,
+                    registrationSubmitted = registrationSubmitted,
+                )
                 persist()
                 applyAccessState(updatedAccess, nowUtcMillis)
             } catch (_: Throwable) {
