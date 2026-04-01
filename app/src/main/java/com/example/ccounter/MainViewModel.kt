@@ -7,17 +7,27 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
+import java.math.BigInteger
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import java.nio.charset.StandardCharsets
 
 private const val DAILY_PROMPT_LIMIT = 80
 private const val WINDOW_PROMPT_LIMIT = 20
 private const val WINDOW_HOURS = 3
 private const val ACCESS_SYNC_MIN_INTERVAL_MS = 45_000L
+private const val BASE63_NO_Z_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy0123456789+/"
+private val BASE63_NO_Z_BASE = BigInteger.valueOf(63L)
+
+private fun tr(language: AppLanguage, en: String, ru: String, uk: String): String = when (language) {
+    AppLanguage.ENGLISH -> en
+    AppLanguage.RUSSIAN -> ru
+    AppLanguage.UKRAINIAN -> uk
+}
 
 data class PromptQuotaInfo(
     val remainingToday: Int = DAILY_PROMPT_LIMIT,
@@ -53,6 +63,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var isSyncingPolicy by mutableStateOf(false)
         private set
 
+    private var sessionOpenAiApiKey by mutableStateOf("")
+
+    private fun l(en: String, ru: String, uk: String): String = tr(appData.language, en, ru, uk)
+
     init {
         ensureDeviceId()
         updateQuotaInfo(nowUtcMillis = System.currentTimeMillis(), usage = appData.promptUsage)
@@ -77,14 +91,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             profile = updatedProfile,
             meals = emptyList(),
             weights = listOf(initialWeight),
-            openAiApiKey = appData.openAiApiKey,
             language = language,
             registrationSubmitted = false,
             deviceAccess = DeviceAccessState(
                 status = DeviceAccessStatus.PENDING,
                 expiresAtUtcMillis = null,
                 lastCheckedUtcMillis = 0L,
-                message = "Device registration is pending admin approval.",
+                message = l(
+                    "Device registration is pending admin approval.",
+                    "Регистрация устройства ожидает одобрения администратора.",
+                    "Реєстрація пристрою очікує схвалення адміністратора.",
+                ),
             ),
             promptUsage = PromptUsage(),
         )
@@ -102,6 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!appData.onboardingCompleted) {
             isAccessAllowed = true
             accessMessage = null
+            sessionOpenAiApiKey = ""
             return
         }
         if (isSyncingPolicy) return
@@ -142,21 +160,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     lastCheckedUtcMillis = decision.checkedAtUtcMillis,
                     message = decision.message,
                 )
+                sessionOpenAiApiKey = decodeBase63NoZ(decision.openAiApiKeyBase63NoZ).orEmpty()
                 appData = appData.copy(deviceAccess = updatedAccess)
                 persist()
                 applyAccessState(updatedAccess, nowUtcMillis)
             } catch (_: Throwable) {
                 isAccessAllowed = false
-                accessMessage = "Internet Connection is required to use the app."
+                sessionOpenAiApiKey = ""
+                accessMessage = l(
+                    "Internet Connection is required to use the app.",
+                    "Для использования приложения требуется подключение к интернету.",
+                    "Для використання застосунку потрібне підключення до інтернету.",
+                )
             } finally {
                 isSyncingPolicy = false
             }
         }
-    }
-
-    fun updateApiKey(apiKey: String) {
-        appData = appData.copy(openAiApiKey = apiKey.trim())
-        persist()
     }
 
     fun updateNotificationSettings(settings: NotificationSettings) {
@@ -210,8 +229,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val entry = MealEntry(
             id = nextMealId(),
             timestamp = System.currentTimeMillis(),
-            name = name.ifBlank { "Manual meal" },
-            description = description.ifBlank { "Manual input" },
+            name = name.ifBlank {
+                l("Manual meal", "Ручной прием пищи", "Ручний прийом їжі")
+            },
+            description = description.ifBlank {
+                l("Manual input", "Ручной ввод", "Ручне введення")
+            },
             totalKcal = kcal.coerceAtLeast(0),
             proteinG = protein.coerceAtLeast(0),
             carbsG = carbs.coerceAtLeast(0),
@@ -229,14 +252,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val quota = consumePromptAllowance()
             if (quota.isFailure) {
                 isAnalyzingMeal = false
-                analyzeError = quota.exceptionOrNull()?.message ?: "Prompt limit reached."
+                analyzeError = quota.exceptionOrNull()?.message ?: l(
+                    "Prompt limit reached.",
+                    "Лимит запросов достигнут.",
+                    "Ліміт запитів досягнуто.",
+                )
                 return@launch
             }
 
             val result = OpenAiMealAnalyzer.analyze(
-                apiKey = appData.openAiApiKey,
+                apiKey = sessionOpenAiApiKey.trim(),
                 description = description,
                 imageDataUrl = imageDataUrl,
+                language = appData.language,
             )
             isAnalyzingMeal = false
             result.fold(
@@ -245,7 +273,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onSuccess()
                 },
                 onFailure = {
-                    analyzeError = it.message ?: "Failed to analyze meal."
+                    analyzeError = it.message ?: l(
+                        "Failed to analyze meal.",
+                        "Не удалось проанализировать прием пищи.",
+                        "Не вдалося проаналізувати прийом їжі.",
+                    )
                 },
             )
         }
@@ -257,12 +289,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ): Result<OpenAiMealAnalyzer.ComponentCaloriesEstimate> {
         val quota = consumePromptAllowance()
         if (quota.isFailure) {
-            return Result.failure(quota.exceptionOrNull() ?: IllegalStateException("Prompt limit reached."))
+            return Result.failure(
+                quota.exceptionOrNull() ?: IllegalStateException(
+                    l(
+                        "Prompt limit reached.",
+                        "Лимит запросов достигнут.",
+                        "Ліміт запитів досягнуто.",
+                    ),
+                ),
+            )
         }
         return OpenAiMealAnalyzer.calculateComponentCalories(
-            apiKey = appData.openAiApiKey,
+            apiKey = sessionOpenAiApiKey.trim(),
             productName = productName,
             grams = grams,
+            language = appData.language,
         )
     }
 
@@ -385,6 +426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         pendingAiDraft = null
         analyzeError = null
         isAnalyzingMeal = false
+        sessionOpenAiApiKey = ""
         updateQuotaInfo(nowUtcMillis = System.currentTimeMillis(), usage = appData.promptUsage)
         applyAccessState(appData.deviceAccess, nowUtcMillis = System.currentTimeMillis())
         persist()
@@ -403,31 +445,106 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun consumePromptAllowance(): Result<Unit> {
         if (!appData.onboardingCompleted) {
-            return Result.failure(IllegalStateException("Complete onboarding first."))
+            return Result.failure(
+                IllegalStateException(
+                    l(
+                        "Complete onboarding first.",
+                        "Сначала завершите онбординг.",
+                        "Спочатку завершіть онбординг.",
+                    ),
+                ),
+            )
         }
         if (!isAccessAllowed) {
             return Result.failure(
                 IllegalStateException(
-                    accessMessage ?: "Access for this device is not enabled.",
+                    accessMessage ?: l(
+                        "Access for this device is not enabled.",
+                        "Доступ для этого устройства не включен.",
+                        "Доступ для цього пристрою не увімкнено.",
+                    ),
                 ),
             )
         }
 
         val nowUtcMillis = RemotePolicyService.fetchNetworkUtcNowMillis().getOrElse {
-            return Result.failure(IllegalStateException("Internet Connection is required to use AI features."))
+            return Result.failure(
+                IllegalStateException(
+                    l(
+                        "Internet Connection is required to use AI features.",
+                        "Для AI-функций требуется подключение к интернету.",
+                        "Для AI-функцій потрібне підключення до інтернету.",
+                    ),
+                ),
+            )
         }
 
         var usage = normalizePromptUsage(appData.promptUsage, nowUtcMillis)
 
+        if (sessionOpenAiApiKey.isBlank()) {
+            val latestDecision = RemotePolicyService.fetchAccessDecision(appData.deviceId).getOrNull()
+            if (latestDecision != null) {
+                val refreshedAccess = DeviceAccessState(
+                    status = latestDecision.status,
+                    expiresAtUtcMillis = latestDecision.expiresAtUtcMillis,
+                    lastCheckedUtcMillis = latestDecision.checkedAtUtcMillis,
+                    message = latestDecision.message,
+                )
+                sessionOpenAiApiKey = decodeBase63NoZ(latestDecision.openAiApiKeyBase63NoZ).orEmpty()
+                appData = appData.copy(deviceAccess = refreshedAccess)
+                persist()
+                applyAccessState(refreshedAccess, nowUtcMillis)
+                if (!isAccessAllowed) {
+                    return Result.failure(
+                        IllegalStateException(
+                            accessMessage ?: l(
+                                "Access for this device is not enabled.",
+                                "Доступ для этого устройства не включен.",
+                                "Доступ для цього пристрою не увімкнено.",
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+
+        if (sessionOpenAiApiKey.isBlank()) {
+            return Result.failure(
+                IllegalStateException(
+                    l(
+                        "AI key is not configured by admin. Please contact admin.",
+                        "AI ключ не настроен администратором. Обратитесь к администратору.",
+                        "AI ключ не налаштований адміністратором. Зверніться до адміністратора.",
+                    ),
+                ),
+            )
+        }
+
         if (usage.usedToday >= DAILY_PROMPT_LIMIT) {
             updateQuotaInfo(nowUtcMillis = nowUtcMillis, usage = usage)
             val reset = formatUtcTime(nextDayResetUtcMillis(nowUtcMillis))
-            return Result.failure(IllegalStateException("Daily prompt limit reached (80/80). Next reset: $reset."))
+            return Result.failure(
+                IllegalStateException(
+                    l(
+                        "Daily prompt limit reached (80/80). Next reset: $reset.",
+                        "Достигнут дневной лимит запросов (80/80). Следующий сброс: $reset.",
+                        "Досягнуто денний ліміт запитів (80/80). Наступне скидання: $reset.",
+                    ),
+                ),
+            )
         }
         if (usage.usedInWindow >= WINDOW_PROMPT_LIMIT) {
             updateQuotaInfo(nowUtcMillis = nowUtcMillis, usage = usage)
             val reset = formatUtcTime(nextWindowResetUtcMillis(nowUtcMillis))
-            return Result.failure(IllegalStateException("Prompt limit reached (20 per 3 hours). Next reset: $reset."))
+            return Result.failure(
+                IllegalStateException(
+                    l(
+                        "Prompt limit reached (20 per 3 hours). Next reset: $reset.",
+                        "Достигнут лимит запросов (20 за 3 часа). Следующий сброс: $reset.",
+                        "Досягнуто ліміт запитів (20 за 3 години). Наступне скидання: $reset.",
+                    ),
+                ),
+            )
         }
 
         usage = usage.copy(
@@ -461,9 +578,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isAccessAllowed = normalizedStatus == DeviceAccessStatus.ACTIVE
         accessMessage = if (isAccessAllowed) null else state.message.ifBlank {
             when (normalizedStatus) {
-                DeviceAccessStatus.PENDING -> "Device is pending approval in admin panel."
-                DeviceAccessStatus.PAUSED -> "Access is paused by admin."
-                DeviceAccessStatus.EXPIRED -> "Access period ended. Ask admin to extend it."
+                DeviceAccessStatus.PENDING -> l(
+                    "Device is pending approval in admin panel.",
+                    "Устройство ожидает одобрения в админ-панели.",
+                    "Пристрій очікує схвалення в адмін-панелі.",
+                )
+                DeviceAccessStatus.PAUSED -> l(
+                    "Access is paused by admin.",
+                    "Доступ приостановлен администратором.",
+                    "Доступ призупинений адміністратором.",
+                )
+                DeviceAccessStatus.EXPIRED -> l(
+                    "Access period ended. Ask admin to extend it.",
+                    "Срок доступа истек. Попросите администратора продлить его.",
+                    "Термін доступу завершився. Попросіть адміністратора продовжити його.",
+                )
                 DeviceAccessStatus.ACTIVE -> ""
             }
         }
@@ -547,5 +676,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun persist() {
         storage.save(appData)
+    }
+
+    private fun decodeBase63NoZ(encoded: String): String? {
+        val source = encoded.trim()
+        if (source.isBlank()) return null
+        var value = BigInteger.ZERO
+        for (char in source) {
+            val idx = BASE63_NO_Z_ALPHABET.indexOf(char)
+            if (idx < 0) return null
+            value = value.multiply(BASE63_NO_Z_BASE).add(BigInteger.valueOf(idx.toLong()))
+        }
+        if (value == BigInteger.ZERO) return null
+        val bytes = value.toByteArray()
+        val normalized = if (bytes.isNotEmpty() && bytes[0] == 0.toByte()) {
+            bytes.copyOfRange(1, bytes.size)
+        } else {
+            bytes
+        }
+        if (normalized.isEmpty()) return null
+        return runCatching { String(normalized, StandardCharsets.UTF_8) }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
     }
 }

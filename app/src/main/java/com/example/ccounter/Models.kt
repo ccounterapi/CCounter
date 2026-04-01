@@ -155,7 +155,6 @@ data class AppData(
     val profile: UserProfile = UserProfile(),
     val meals: List<MealEntry> = defaultMeals(),
     val weights: List<WeightEntry> = defaultWeights(),
-    val openAiApiKey: String = "",
     val notifications: NotificationSettings = NotificationSettings(),
     val language: AppLanguage = AppLanguage.ENGLISH,
     val deviceId: String = "",
@@ -219,10 +218,22 @@ fun defaultMeals(): List<MealEntry> = emptyList()
 
 fun defaultWeights(): List<WeightEntry> = emptyList()
 
-fun GoalType.label(): String = when (this) {
-    GoalType.LOSE -> "Lose weight"
-    GoalType.MAINTAIN -> "Maintain"
-    GoalType.GAIN -> "Gain weight"
+fun GoalType.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        GoalType.LOSE -> "Lose weight"
+        GoalType.MAINTAIN -> "Maintain"
+        GoalType.GAIN -> "Gain weight"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        GoalType.LOSE -> "Сбросить вес"
+        GoalType.MAINTAIN -> "Поддерживать"
+        GoalType.GAIN -> "Набрать вес"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        GoalType.LOSE -> "Схуднути"
+        GoalType.MAINTAIN -> "Підтримувати"
+        GoalType.GAIN -> "Набрати вагу"
+    }
 }
 
 fun resolveGoalTypeByWeights(currentWeightKg: Double, goalWeightKg: Double): GoalType {
@@ -233,38 +244,106 @@ fun resolveGoalTypeByWeights(currentWeightKg: Double, goalWeightKg: Double): Goa
     }
 }
 
-fun ActivityLevel.label(): String = when (this) {
-    ActivityLevel.LOW -> "Low"
-    ActivityLevel.MEDIUM -> "Medium"
-    ActivityLevel.HIGH -> "High"
+fun ActivityLevel.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        ActivityLevel.LOW -> "Low"
+        ActivityLevel.MEDIUM -> "Medium"
+        ActivityLevel.HIGH -> "High"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        ActivityLevel.LOW -> "Низкая"
+        ActivityLevel.MEDIUM -> "Средняя"
+        ActivityLevel.HIGH -> "Высокая"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        ActivityLevel.LOW -> "Низька"
+        ActivityLevel.MEDIUM -> "Середня"
+        ActivityLevel.HIGH -> "Висока"
+    }
 }
 
-fun GenderType.label(): String = when (this) {
-    GenderType.MALE -> "Male"
-    GenderType.FEMALE -> "Female"
-    GenderType.OTHER -> "Other"
+fun GenderType.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        GenderType.MALE -> "Male"
+        GenderType.FEMALE -> "Female"
+        GenderType.OTHER -> "Other"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        GenderType.MALE -> "Мужской"
+        GenderType.FEMALE -> "Женский"
+        GenderType.OTHER -> "Другое"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        GenderType.MALE -> "Чоловіча"
+        GenderType.FEMALE -> "Жіноча"
+        GenderType.OTHER -> "Інше"
+    }
 }
 
-fun NotificationSound.label(): String = when (this) {
-    NotificationSound.DEFAULT -> "Default"
-    NotificationSound.BELL -> "Bell"
-    NotificationSound.CHIME -> "Chime"
+fun NotificationSound.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        NotificationSound.DEFAULT -> "Default"
+        NotificationSound.BELL -> "Bell"
+        NotificationSound.CHIME -> "Chime"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        NotificationSound.DEFAULT -> "По умолчанию"
+        NotificationSound.BELL -> "Колокольчик"
+        NotificationSound.CHIME -> "Перезвон"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        NotificationSound.DEFAULT -> "За замовчуванням"
+        NotificationSound.BELL -> "Дзвінок"
+        NotificationSound.CHIME -> "Передзвін"
+    }
 }
 
-fun WeightReminderFrequency.label(): String = when (this) {
-    WeightReminderFrequency.DAILY -> "Daily"
-    WeightReminderFrequency.WEEKLY -> "Weekly"
-    WeightReminderFrequency.CUSTOM -> "Custom"
+fun WeightReminderFrequency.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        WeightReminderFrequency.DAILY -> "Daily"
+        WeightReminderFrequency.WEEKLY -> "Weekly"
+        WeightReminderFrequency.CUSTOM -> "Custom"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        WeightReminderFrequency.DAILY -> "Ежедневно"
+        WeightReminderFrequency.WEEKLY -> "Еженедельно"
+        WeightReminderFrequency.CUSTOM -> "Свое"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        WeightReminderFrequency.DAILY -> "Щодня"
+        WeightReminderFrequency.WEEKLY -> "Щотижня"
+        WeightReminderFrequency.CUSTOM -> "Власне"
+    }
 }
 
-fun WeekDay.label(): String = when (this) {
-    WeekDay.MON -> "Mon"
-    WeekDay.TUE -> "Tue"
-    WeekDay.WED -> "Wed"
-    WeekDay.THU -> "Thu"
-    WeekDay.FRI -> "Fri"
-    WeekDay.SAT -> "Sat"
-    WeekDay.SUN -> "Sun"
+fun WeekDay.label(language: AppLanguage = AppLanguage.ENGLISH): String = when (language) {
+    AppLanguage.ENGLISH -> when (this) {
+        WeekDay.MON -> "Mon"
+        WeekDay.TUE -> "Tue"
+        WeekDay.WED -> "Wed"
+        WeekDay.THU -> "Thu"
+        WeekDay.FRI -> "Fri"
+        WeekDay.SAT -> "Sat"
+        WeekDay.SUN -> "Sun"
+    }
+    AppLanguage.RUSSIAN -> when (this) {
+        WeekDay.MON -> "Пн"
+        WeekDay.TUE -> "Вт"
+        WeekDay.WED -> "Ср"
+        WeekDay.THU -> "Чт"
+        WeekDay.FRI -> "Пт"
+        WeekDay.SAT -> "Сб"
+        WeekDay.SUN -> "Вс"
+    }
+    AppLanguage.UKRAINIAN -> when (this) {
+        WeekDay.MON -> "Пн"
+        WeekDay.TUE -> "Вт"
+        WeekDay.WED -> "Ср"
+        WeekDay.THU -> "Чт"
+        WeekDay.FRI -> "Пт"
+        WeekDay.SAT -> "Сб"
+        WeekDay.SUN -> "Нд"
+    }
 }
 
 fun AppLanguage.label(): String = when (this) {

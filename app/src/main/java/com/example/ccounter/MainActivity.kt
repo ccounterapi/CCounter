@@ -86,7 +86,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.Text as M3Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -99,6 +99,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -121,11 +122,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -133,6 +137,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -223,6 +228,307 @@ private fun tr(language: AppLanguage, en: String, ru: String, uk: String): Strin
     AppLanguage.UKRAINIAN -> uk
 }
 
+private val LocalAppLanguage = compositionLocalOf { AppLanguage.ENGLISH }
+
+private fun localeForLanguage(language: AppLanguage): Locale = when (language) {
+    AppLanguage.ENGLISH -> Locale.ENGLISH
+    AppLanguage.RUSSIAN -> Locale("ru")
+    AppLanguage.UKRAINIAN -> Locale("uk")
+}
+
+@Composable
+private fun tt(en: String, ru: String, uk: String): String {
+    return tr(LocalAppLanguage.current, en, ru, uk)
+}
+
+private fun translateLanguageName(label: String, language: AppLanguage): String {
+    val normalized = label.trim()
+    return when (language) {
+        AppLanguage.ENGLISH -> when (normalized) {
+            "English", "Английский", "Англійська" -> "English"
+            "Русский", "Russian", "Російська" -> "Русский"
+            "Українська", "Ukrainian", "Украинский" -> "Українська"
+            else -> normalized
+        }
+        AppLanguage.RUSSIAN -> when (normalized) {
+            "English", "Английский", "Англійська" -> "Английский"
+            "Русский", "Russian", "Російська" -> "Русский"
+            "Українська", "Ukrainian", "Украинский" -> "Украинский"
+            else -> normalized
+        }
+        AppLanguage.UKRAINIAN -> when (normalized) {
+            "English", "Английский", "Англійська" -> "Англійська"
+            "Русский", "Russian", "Російська" -> "Російська"
+            "Українська", "Ukrainian", "Украинский" -> "Українська"
+            else -> normalized
+        }
+    }
+}
+
+private val targetRegex = Regex("""^—\s+Target\s+(.+)$""")
+private val goalRegex = Regex("""^—\s+Goal\s+(.+)$""")
+private val weightTrendRegex = Regex("""^Weight trend —\s+(.+)$""")
+private val languageSettingRegex = Regex("""^Language \((.+)\)$""")
+private val proteinCarbsFatRegex = Regex("""^Protein\s+(\d+)g\s*\|\s*Carbs\s+(\d+)g\s*\|\s*Fat\s+(\d+)g$""")
+private val pcfShortRegex = Regex("""^P\s+(\d+)g\s+C\s+(\d+)g\s+F\s+(\d+)g$""")
+
+private fun localizeLiteralText(text: String, language: AppLanguage): String {
+    if (language == AppLanguage.ENGLISH) return text
+
+    val exact = when (text) {
+        "Retry" -> tr(language, "Retry", "Повторить", "Повторити")
+        "Get Started" -> tr(language, "Get Started", "Начать", "Почати")
+        "Language" -> tr(language, "Language", "Язык", "Мова")
+        "Choose app language" -> tr(language, "Choose app language", "Выберите язык приложения", "Оберіть мову застосунку")
+        "What's your goal?" -> tr(language, "What's your goal?", "Какая у вас цель?", "Яка у вас ціль?")
+        "We'll personalize your calorie target" -> tr(language, "We'll personalize your calorie target", "Мы персонализируем вашу норму калорий", "Ми персоналізуємо вашу норму калорій")
+        "Activity level" -> tr(language, "Activity level", "Уровень активности", "Рівень активності")
+        "How active are you daily?" -> tr(language, "How active are you daily?", "Насколько вы активны ежедневно?", "Наскільки ви активні щодня?")
+        "Profile" -> tr(language, "Profile", "Профиль", "Профіль")
+        "Add your name and photo" -> tr(language, "Add your name and photo", "Добавьте имя и фото", "Додайте ім'я та фото")
+        "Visible in your profile" -> tr(language, "Visible in your profile", "Видно в вашем профиле", "Видно у вашому профілі")
+        "Add profile photo" -> tr(language, "Add profile photo", "Добавить фото профиля", "Додати фото профілю")
+        "Choose" -> tr(language, "Choose", "Выбрать", "Обрати")
+        "Gender" -> tr(language, "Gender", "Пол", "Стать")
+        "Age" -> tr(language, "Age", "Возраст", "Вік")
+        "Height" -> tr(language, "Height", "Рост", "Зріст")
+        "Starting weight" -> tr(language, "Starting weight", "Начальный вес", "Початкова вага")
+        "Goal weight" -> tr(language, "Goal weight", "Целевой вес", "Цільова вага")
+        "Goal Weight" -> tr(language, "Goal Weight", "Целевой вес", "Цільова вага")
+        "Your daily target" -> tr(language, "Your daily target", "Ваша дневная цель", "Ваша денна ціль")
+        "Based on your profile" -> tr(language, "Based on your profile", "На основе вашего профиля", "На основі вашого профілю")
+        "kcal / day" -> tr(language, "kcal / day", "ккал / день", "ккал / день")
+        "Continue" -> tr(language, "Continue", "Продолжить", "Продовжити")
+        "Next" -> tr(language, "Next", "Далее", "Далі")
+        "Good morning" -> tr(language, "Good morning", "Доброе утро", "Доброго ранку")
+        "Today's intake" -> tr(language, "Today's intake", "Потребление сегодня", "Спожито сьогодні")
+        "Today's meals" -> tr(language, "Today's meals", "Приемы пищи сегодня", "Прийоми їжі сьогодні")
+        "View all" -> tr(language, "View all", "Смотреть все", "Дивитись все")
+        "Add meal" -> tr(language, "Add meal", "Добавить прием пищи", "Додати прийом їжі")
+        "Edit meal" -> tr(language, "Edit meal", "Редактировать прием пищи", "Редагувати прийом їжі")
+        "Add photo" -> tr(language, "Add photo", "Добавить фото", "Додати фото")
+        "Change photo" -> tr(language, "Change photo", "Изменить фото", "Змінити фото")
+        "Meal name" -> tr(language, "Meal name", "Название блюда", "Назва страви")
+        "Description" -> tr(language, "Description", "Описание", "Опис")
+        "Calories" -> tr(language, "Calories", "Калории", "Калорії")
+        "Protein (g)" -> tr(language, "Protein (g)", "Белки (г)", "Білки (г)")
+        "Carbs (g)" -> tr(language, "Carbs (g)", "Углеводы (г)", "Вуглеводи (г)")
+        "Fat (g)" -> tr(language, "Fat (g)", "Жиры (г)", "Жири (г)")
+        "Meal time" -> tr(language, "Meal time", "Время приема пищи", "Час прийому їжі")
+        "Delete" -> tr(language, "Delete", "Удалить", "Видалити")
+        "Save changes" -> tr(language, "Save changes", "Сохранить изменения", "Зберегти зміни")
+        "Daily Log" -> tr(language, "Daily Log", "Дневник", "Щоденник")
+        "consumed" -> tr(language, "consumed", "съедено", "спожито")
+        "target" -> tr(language, "target", "цель", "ціль")
+        "over" -> tr(language, "over", "сверх", "понад")
+        "remaining" -> tr(language, "remaining", "осталось", "залишилось")
+        "Statistics" -> tr(language, "Statistics", "Статистика", "Статистика")
+        "Calorie tracking overview" -> tr(language, "Calorie tracking overview", "Обзор отслеживания калорий", "Огляд відстеження калорій")
+        "Daily avg" -> tr(language, "Daily avg", "Среднее в день", "Середнє за день")
+        "Target" -> tr(language, "Target", "Цель", "Ціль")
+        "Activity" -> tr(language, "Activity", "Активность", "Активність")
+        "vs Target" -> tr(language, "vs Target", "vs Цель", "vs Ціль")
+        "Best day" -> tr(language, "Best day", "Лучший день", "Найкращий день")
+        "closest to goal" -> tr(language, "closest to goal", "ближе всего к цели", "найближче до цілі")
+        "Macros this week" -> tr(language, "Macros this week", "БЖУ за неделю", "БЖВ за тиждень")
+        "Macros today" -> tr(language, "Macros today", "БЖУ сегодня", "БЖВ сьогодні")
+        "DAILY BREAKDOWN" -> tr(language, "DAILY BREAKDOWN", "РАЗБИВКА ПО ДНЯМ", "РОЗБИВКА ПО ДНЯХ")
+        "Today" -> tr(language, "Today", "Сегодня", "Сьогодні")
+        "This Week" -> tr(language, "This Week", "Эта неделя", "Цей тиждень")
+        "Calories this week" -> tr(language, "Calories this week", "Калории за неделю", "Калорії за тиждень")
+        "No data yet" -> tr(language, "No data yet", "Пока нет данных", "Поки немає даних")
+        "Weight" -> tr(language, "Weight", "Вес", "Вага")
+        "Track your progress" -> tr(language, "Track your progress", "Отслеживайте прогресс", "Відстежуйте прогрес")
+        "Add weight" -> tr(language, "Add weight", "Добавить вес", "Додати вагу")
+        "RECENT ENTRIES" -> tr(language, "RECENT ENTRIES", "ПОСЛЕДНИЕ ЗАПИСИ", "ОСТАННІ ЗАПИСИ")
+        "No weight entries yet" -> tr(language, "No weight entries yet", "Пока нет записей веса", "Поки немає записів ваги")
+        "Log weight" -> tr(language, "Log weight", "Записать вес", "Записати вагу")
+        "Weight (kg)" -> tr(language, "Weight (kg)", "Вес (кг)", "Вага (кг)")
+        "Save" -> tr(language, "Save", "Сохранить", "Зберегти")
+        "Cancel" -> tr(language, "Cancel", "Отмена", "Скасувати")
+        "Edit weight" -> tr(language, "Edit weight", "Редактировать вес", "Редагувати вагу")
+        "DATE (YYYY-MM-DD)" -> tr(language, "DATE (YYYY-MM-DD)", "ДАТА (ГГГГ-ММ-ДД)", "ДАТА (РРРР-ММ-ДД)")
+        "WEIGHT (KG)" -> tr(language, "WEIGHT (KG)", "ВЕС (КГ)", "ВАГА (КГ)")
+        "Current weight" -> tr(language, "Current weight", "Текущий вес", "Поточна вага")
+        "Progress to goal" -> tr(language, "Progress to goal", "Прогресс к цели", "Прогрес до цілі")
+        "Start" -> tr(language, "Start", "Старт", "Початок")
+        "Goal" -> tr(language, "Goal", "Цель", "Ціль")
+        "Remaining to goal" -> tr(language, "Remaining to goal", "Осталось до цели", "Залишилось до цілі")
+        "Notifications" -> tr(language, "Notifications", "Уведомления", "Сповіщення")
+        "Enable notifications permission to receive reminders." -> tr(language, "Enable notifications permission to receive reminders.", "Разрешите уведомления, чтобы получать напоминания.", "Дозвольте сповіщення, щоб отримувати нагадування.")
+        "Allow notifications" -> tr(language, "Allow notifications", "Разрешить уведомления", "Дозволити сповіщення")
+        "Meal reminders" -> tr(language, "Meal reminders", "Напоминания о приеме пищи", "Нагадування про прийом їжі")
+        "Meals per day" -> tr(language, "Meals per day", "Приемов пищи в день", "Прийомів їжі на день")
+        "Breakfast" -> tr(language, "Breakfast", "Завтрак", "Сніданок")
+        "Lunch" -> tr(language, "Lunch", "Обед", "Обід")
+        "Dinner" -> tr(language, "Dinner", "Ужин", "Вечеря")
+        "Snacks" -> tr(language, "Snacks", "Перекусы", "Перекуси")
+        "Weight reminder" -> tr(language, "Weight reminder", "Напоминание о весе", "Нагадування про вагу")
+        "Frequency" -> tr(language, "Frequency", "Частота", "Частота")
+        "Day" -> tr(language, "Day", "День", "День")
+        "Every N days" -> tr(language, "Every N days", "Каждые N дней", "Кожні N днів")
+        "Days (2-30)" -> tr(language, "Days (2-30)", "Дней (2-30)", "Днів (2-30)")
+        "Time" -> tr(language, "Time", "Время", "Час")
+        "Settings auto-save automatically." -> tr(language, "Settings auto-save automatically.", "Настройки сохраняются автоматически.", "Налаштування зберігаються автоматично.")
+        "Breakfast time" -> tr(language, "Breakfast time", "Время завтрака", "Час сніданку")
+        "Lunch time" -> tr(language, "Lunch time", "Время обеда", "Час обіду")
+        "Dinner time" -> tr(language, "Dinner time", "Время ужина", "Час вечері")
+        "Weight reminder time" -> tr(language, "Weight reminder time", "Время напоминания о весе", "Час нагадування про вагу")
+        "Edit name and photo" -> tr(language, "Edit name and photo", "Редактировать имя и фото", "Редагувати ім'я та фото")
+        "BODY INFO" -> tr(language, "BODY INFO", "ИНФО О ТЕЛЕ", "ІНФО ПРО ТІЛО")
+        "SETTINGS" -> tr(language, "SETTINGS", "НАСТРОЙКИ", "НАЛАШТУВАННЯ")
+        "OpenAI API" -> tr(language, "OpenAI API", "OpenAI API", "OpenAI API")
+        "Sign out" -> tr(language, "Sign out", "Выйти", "Вийти")
+        "Edit profile" -> tr(language, "Edit profile", "Редактировать профиль", "Редагувати профіль")
+        "Edit body info" -> tr(language, "Edit body info", "Редактировать данные", "Редагувати дані")
+        "OpenAI API key" -> tr(language, "OpenAI API key", "Ключ OpenAI API", "Ключ OpenAI API")
+        "API key" -> tr(language, "API key", "API ключ", "API ключ")
+        "English interface" -> tr(language, "English interface", "Английский интерфейс", "Англійський інтерфейс")
+        "Русский интерфейс" -> tr(language, "Русский интерфейс", "Русский интерфейс", "Російський інтерфейс")
+        "Український інтерфейс" -> tr(language, "Український інтерфейс", "Украинский интерфейс", "Український інтерфейс")
+        "Add Meal" -> tr(language, "Add Meal", "Добавить прием пищи", "Додати прийом їжі")
+        "How do you want to log your meal?" -> tr(language, "How do you want to log your meal?", "Как вы хотите добавить прием пищи?", "Як ви хочете додати прийом їжі?")
+        "Use English interface" -> tr(language, "Use English interface", "Использовать английский интерфейс", "Використовувати англійський інтерфейс")
+        "You can always edit it later in Profile -> OpenAI API." -> tr(language, "The AI key is managed by admin.", "AI ключ управляется администратором.", "AI ключ керується адміністратором.")
+        "Add API Key" -> tr(language, "Contact admin", "Связаться с админом", "Зв'язатися з адміном")
+        "Change Key" -> tr(language, "Contact admin", "Связаться с админом", "Зв'язатися з адміном")
+        "Take photo" -> tr(language, "Take photo", "Сделать фото", "Зробити фото")
+        "Snap a photo of your meal" -> tr(language, "Snap a photo of your meal", "Сфотографируйте ваш прием пищи", "Сфотографуйте ваш прийом їжі")
+        "Upload photo" -> tr(language, "Upload photo", "Загрузить фото", "Завантажити фото")
+        "Choose from gallery" -> tr(language, "Choose from gallery", "Выбрать из галереи", "Обрати з галереї")
+        "Describe meal" -> tr(language, "Describe meal", "Описать блюдо", "Описати страву")
+        "Type what you ate" -> tr(language, "Type what you ate", "Введите, что вы съели", "Введіть, що ви з'їли")
+        "Manual input" -> tr(language, "Manual input", "Ручной ввод", "Ручне введення")
+        "Enter calories yourself" -> tr(language, "Enter calories yourself", "Введите калории вручную", "Введіть калорії вручну")
+        "Meal photo" -> tr(language, "Meal photo", "Фото блюда", "Фото страви")
+        "Retake" -> tr(language, "Retake", "Переснять", "Перезняти")
+        "Upload" -> tr(language, "Upload", "Загрузить", "Завантажити")
+        "Change" -> tr(language, "Change", "Изменить", "Змінити")
+        "Describe your meal" -> tr(language, "Describe your meal", "Опишите ваш прием пищи", "Опишіть ваш прийом їжі")
+        "Manual meal" -> tr(language, "Manual meal", "Ручной прием пищи", "Ручний прийом їжі")
+        "Save meal" -> tr(language, "Save meal", "Сохранить прием пищи", "Зберегти прийом їжі")
+        "Analyzing..." -> tr(language, "Analyzing...", "Анализ...", "Аналіз...")
+        "Analyze with AI" -> tr(language, "Analyze with AI", "Анализировать с AI", "Аналізувати з AI")
+        "Change method" -> tr(language, "Change method", "Изменить способ", "Змінити спосіб")
+        "You can always change this key later in Profile -> OpenAI API." -> tr(language, "The AI key is managed in admin panel.", "AI ключ настраивается в админ-панели.", "AI ключ налаштовується в адмін-панелі.")
+        "No AI result yet" -> tr(language, "No AI result yet", "Пока нет результата AI", "Поки немає результату AI")
+        "Back" -> tr(language, "Back", "Назад", "Назад")
+        "AI Analysis" -> tr(language, "AI Analysis", "AI Анализ", "AI Аналіз")
+        "Draft - please review before saving" -> tr(language, "Draft - please review before saving", "Черновик - проверьте перед сохранением", "Чернетка - перевірте перед збереженням")
+        "Protein" -> tr(language, "Protein", "Белки", "Білки")
+        "Carbs" -> tr(language, "Carbs", "Углеводы", "Вуглеводи")
+        "Fat" -> tr(language, "Fat", "Жиры", "Жири")
+        "Recognized items" -> tr(language, "Recognized items", "Распознанные компоненты", "Розпізнані компоненти")
+        "Add" -> tr(language, "Add", "Добавить", "Додати")
+        "Confirm" -> tr(language, "Confirm", "Подтвердить", "Підтвердити")
+        "Edit component" -> tr(language, "Edit component", "Редактировать компонент", "Редагувати компонент")
+        "Name" -> tr(language, "Name", "Название", "Назва")
+        "Weight (g)" -> tr(language, "Weight (g)", "Вес (г)", "Вага (г)")
+        "Calories (kcal)" -> tr(language, "Calories (kcal)", "Калории (ккал)", "Калорії (ккал)")
+        "Please type a name of something edible" -> tr(language, "Please type a name of something edible", "Введите название чего-то съедобного", "Введіть назву чогось їстівного")
+        "Failed to calculate calories. Try again." -> tr(language, "Failed to calculate calories. Try again.", "Не удалось посчитать калории. Попробуйте снова.", "Не вдалося порахувати калорії. Спробуйте ще раз.")
+        "Calculating..." -> tr(language, "Calculating...", "Подсчет...", "Розрахунок...")
+        "✨Calculate Calories" -> tr(language, "✨Calculate Calories", "✨Посчитать калории", "✨Порахувати калорії")
+        "0 Calories" -> tr(language, "0 Calories", "0 Калорий", "0 Калорій")
+        "Internet required" -> tr(language, "Internet required", "Нужен интернет", "Потрібен інтернет")
+        "Internet connection must stay enabled to use the app." -> tr(language, "Internet connection must stay enabled to use the app.", "Для использования приложения интернет должен быть включен.", "Для використання застосунку інтернет має бути увімкнений.")
+        "Access required" -> tr(language, "Access required", "Требуется доступ", "Потрібен доступ")
+        "Device is waiting for admin approval." -> tr(language, "Device is waiting for admin approval.", "Устройство ожидает одобрения администратора.", "Пристрій очікує схвалення адміністратора.")
+        "Device is pending approval in admin panel." -> tr(language, "Device is pending approval in admin panel.", "Устройство ожидает одобрения в админ-панели.", "Пристрій очікує схвалення в адмін-панелі.")
+        "Access is paused by admin." -> tr(language, "Access is paused by admin.", "Доступ приостановлен администратором.", "Доступ призупинено адміністратором.")
+        "Access period ended. Ask admin to extend it." -> tr(language, "Access period ended. Ask admin to extend it.", "Срок доступа истек. Попросите администратора продлить его.", "Термін доступу завершився. Попросіть адміністратора продовжити його.")
+        "Access is not enabled yet. Please approve this device in admin panel." -> tr(language, "Access is not enabled yet. Please approve this device in admin panel.", "Доступ пока не включен. Подтвердите устройство в админ-панели.", "Доступ поки не увімкнено. Підтвердіть пристрій в адмін-панелі.")
+        "Internet Connection is required to use the app." -> tr(language, "Internet Connection is required to use the app.", "Для использования приложения требуется подключение к интернету.", "Для використання застосунку потрібне підключення до інтернету.")
+        "Internet Connection is required to use AI features." -> tr(language, "Internet Connection is required to use AI features.", "Для AI-функций требуется подключение к интернету.", "Для AI-функцій потрібне підключення до інтернету.")
+        "Add your OpenAI API key in Profile first." -> tr(language, "AI key is not configured by admin. Please contact admin.", "AI ключ не настроен администратором. Обратитесь к администратору.", "AI ключ не налаштований адміністратором. Зверніться до адміністратора.")
+        "No Internet Connection. Please check your internet and try again." -> tr(language, "No Internet Connection. Please check your internet and try again.", "Нет подключения к интернету. Проверьте интернет и попробуйте снова.", "Немає підключення до інтернету. Перевірте інтернет і спробуйте ще раз.")
+        "Request timed out. Please check your internet and try again." -> tr(language, "Request timed out. Please check your internet and try again.", "Время ожидания запроса истекло. Проверьте интернет и попробуйте снова.", "Час очікування запиту вичерпано. Перевірте інтернет і спробуйте ще раз.")
+        "Failed to analyze meal. Try again." -> tr(language, "Failed to analyze meal. Try again.", "Не удалось проанализировать прием пищи. Попробуйте снова.", "Не вдалося проаналізувати прийом їжі. Спробуйте ще раз.")
+        else -> null
+    }
+    var out = exact ?: text
+
+    if (exact == null) {
+        out = targetRegex.replace(out) { m ->
+            tr(language, "—  Target ${m.groupValues[1]}", "—  Цель ${m.groupValues[1]}", "—  Ціль ${m.groupValues[1]}")
+        }
+        out = goalRegex.replace(out) { m ->
+            tr(language, "—  Goal ${m.groupValues[1]}", "—  Цель ${m.groupValues[1]}", "—  Ціль ${m.groupValues[1]}")
+        }
+        out = weightTrendRegex.replace(out) { m ->
+            tr(language, "Weight trend — ${m.groupValues[1]}", "Тренд веса — ${m.groupValues[1]}", "Тренд ваги — ${m.groupValues[1]}")
+        }
+        out = languageSettingRegex.replace(out) { m ->
+            val label = translateLanguageName(m.groupValues[1], language)
+            tr(language, "Language ($label)", "Язык ($label)", "Мова ($label)")
+        }
+        out = proteinCarbsFatRegex.replace(out) { m ->
+            tr(
+                language,
+                "Protein ${m.groupValues[1]}g | Carbs ${m.groupValues[2]}g | Fat ${m.groupValues[3]}g",
+                "Белки ${m.groupValues[1]}г | Углеводы ${m.groupValues[2]}г | Жиры ${m.groupValues[3]}г",
+                "Білки ${m.groupValues[1]}г | Вуглеводи ${m.groupValues[2]}г | Жири ${m.groupValues[3]}г",
+            )
+        }
+        out = pcfShortRegex.replace(out) { m ->
+            tr(
+                language,
+                "P ${m.groupValues[1]}g  C ${m.groupValues[2]}g  F ${m.groupValues[3]}g",
+                "Б ${m.groupValues[1]}г  У ${m.groupValues[2]}г  Ж ${m.groupValues[3]}г",
+                "Б ${m.groupValues[1]}г  В ${m.groupValues[2]}г  Ж ${m.groupValues[3]}г",
+            )
+        }
+    }
+
+    if (language != AppLanguage.ENGLISH) {
+        out = out.replace("kcal", "ккал")
+        out = out.replace("yrs", tr(language, "yrs", "лет", "років"))
+        out = out.replace(" years", tr(language, " years", " лет", " років"))
+    }
+    return out
+}
+
+@Composable
+private fun Text(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontStyle: FontStyle? = null,
+    fontWeight: FontWeight? = null,
+    fontFamily: FontFamily? = null,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    textDecoration: TextDecoration? = null,
+    textAlign: TextAlign? = null,
+    lineHeight: TextUnit = TextUnit.Unspecified,
+    overflow: TextOverflow = TextOverflow.Clip,
+    softWrap: Boolean = true,
+    maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
+    style: TextStyle = TextStyle.Default,
+) {
+    M3Text(
+        text = localizeLiteralText(text, LocalAppLanguage.current),
+        modifier = modifier,
+        color = color,
+        fontSize = fontSize,
+        fontStyle = fontStyle,
+        fontWeight = fontWeight,
+        fontFamily = fontFamily,
+        letterSpacing = letterSpacing,
+        textDecoration = textDecoration,
+        textAlign = textAlign,
+        lineHeight = lineHeight,
+        overflow = overflow,
+        softWrap = softWrap,
+        maxLines = maxLines,
+        minLines = minLines,
+        onTextLayout = onTextLayout,
+        style = style,
+    )
+}
+
 @Composable
 private fun CCounterApp(
     viewModel: MainViewModel,
@@ -237,6 +543,11 @@ private fun CCounterApp(
     val startRoute = if (appData.onboardingCompleted) Routes.Home else Routes.Landing
     val isInternetAvailable by rememberInternetAvailableState()
     var dragAccum by remember(currentRoute) { mutableFloatStateOf(0f) }
+    val appLocale = remember(appData.language) { localeForLanguage(appData.language) }
+
+    LaunchedEffect(appLocale) {
+        Locale.setDefault(appLocale)
+    }
 
     LaunchedEffect(pendingRoute, appData.onboardingCompleted) {
         if (pendingRoute.isNullOrBlank()) return@LaunchedEffect
@@ -302,27 +613,28 @@ private fun CCounterApp(
         Modifier
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = Bg,
-            bottomBar = {
-                if (currentRoute in mainRoutes) {
-                    AppBottomBar(
-                        navController = navController,
-                        currentRoute = currentRoute ?: Routes.Home,
-                        language = appData.language,
-                    )
-                }
-            },
-        ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = startRoute,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(swipeModifier)
-                    .padding(bottom = padding.calculateBottomPadding()),
-            ) {
+    CompositionLocalProvider(LocalAppLanguage provides appData.language) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                containerColor = Bg,
+                bottomBar = {
+                    if (currentRoute in mainRoutes) {
+                        AppBottomBar(
+                            navController = navController,
+                            currentRoute = currentRoute ?: Routes.Home,
+                            language = appData.language,
+                        )
+                    }
+                },
+            ) { padding ->
+                NavHost(
+                    navController = navController,
+                    startDestination = startRoute,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(swipeModifier)
+                        .padding(bottom = padding.calculateBottomPadding()),
+                ) {
                 composable(Routes.Landing) {
                     LandingScreen(
                         onStart = { navController.navigate(Routes.Onboarding) },
@@ -378,10 +690,8 @@ private fun CCounterApp(
                 composable(Routes.Profile) {
                     ProfileScreen(
                         profile = appData.profile,
-                        apiKey = appData.openAiApiKey,
                         language = appData.language,
                         onSaveProfile = { viewModel.updateProfile(it) },
-                        onSaveApiKey = { viewModel.updateApiKey(it) },
                         onSaveLanguage = { viewModel.updateLanguage(it) },
                         onOpenNotifications = { navController.navigate(Routes.Notifications) },
                         onSignOut = {
@@ -404,10 +714,7 @@ private fun CCounterApp(
                     AddMealScreen(
                         isAnalyzing = viewModel.isAnalyzingMeal,
                         analyzeError = viewModel.analyzeError,
-                        initialApiKey = appData.openAiApiKey,
-                        isApiKeyMissing = appData.openAiApiKey.isBlank(),
                         onDismissError = viewModel::clearAnalyzeError,
-                        onSaveApiKey = viewModel::updateApiKey,
                         onBack = { navController.popBackStack() },
                         onSaveManual = { name, description, kcal, protein, carbs, fat ->
                             viewModel.addManualMeal(name, description, kcal, protein, carbs, fat)
@@ -438,23 +745,24 @@ private fun CCounterApp(
                         },
                     )
                 }
+                }
             }
-        }
 
-        if (!isInternetAvailable) {
-            AppBlockingOverlay(
-                title = "Internet required",
-                message = "Internet connection must stay enabled to use the app.",
-                showRetry = false,
-                onRetry = {},
-            )
-        } else if (appData.onboardingCompleted && !viewModel.isAccessAllowed) {
-            AppBlockingOverlay(
-                title = "Access required",
-                message = viewModel.accessMessage ?: "Device is waiting for admin approval.",
-                showRetry = true,
-                onRetry = { viewModel.refreshRemotePolicy(force = true) },
-            )
+            if (!isInternetAvailable) {
+                AppBlockingOverlay(
+                    title = "Internet required",
+                    message = "Internet connection must stay enabled to use the app.",
+                    showRetry = false,
+                    onRetry = {},
+                )
+            } else if (appData.onboardingCompleted && !viewModel.isAccessAllowed) {
+                AppBlockingOverlay(
+                    title = "Access required",
+                    message = viewModel.accessMessage ?: "Device is waiting for admin approval.",
+                    showRetry = true,
+                    onRetry = { viewModel.refreshRemotePolicy(force = true) },
+                )
+            }
         }
     }
 }
@@ -845,7 +1153,7 @@ private fun OnboardingScreen(
                         GoalType.entries.forEach { item ->
                             SelectableCard(
                                 selected = goal == item,
-                                title = item.label(),
+                                title = item.label(selectedLanguage),
                                 description = when (item) {
                                     GoalType.LOSE -> "Calorie deficit"
                                     GoalType.MAINTAIN -> "Stay balanced"
@@ -869,7 +1177,7 @@ private fun OnboardingScreen(
                         ActivityLevel.entries.forEach { item ->
                             SelectableCard(
                                 selected = activity == item,
-                                title = item.label(),
+                                title = item.label(selectedLanguage),
                                 description = when (item) {
                                     ActivityLevel.LOW -> "Sedentary, mostly sitting"
                                     ActivityLevel.MEDIUM -> "Light exercise 3-5 days/week"
@@ -923,7 +1231,7 @@ private fun OnboardingScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             GenderType.entries.forEach { item ->
                                 FilterButton(
-                                    text = item.label(),
+                                    text = item.label(selectedLanguage),
                                     selected = gender == item,
                                     modifier = Modifier.weight(1f),
                                     onClick = { gender = item },
@@ -1409,6 +1717,7 @@ private fun StatsScreen(meals: List<MealEntry>, target: Int) {
     var period by rememberSaveable { mutableStateOf("day") }
     val zone = ZoneId.systemDefault()
     val today = LocalDate.now()
+    val appLocale = localeForLanguage(LocalAppLanguage.current)
     val density = LocalDensity.current
     val weekStart = today.minusDays(6)
 
@@ -1468,7 +1777,7 @@ private fun StatsScreen(meals: List<MealEntry>, target: Int) {
         else -> "on target"
     }
     val bestDay = weekData.minByOrNull { abs(it.second - target) }?.first
-    val bestDayLabel = bestDay?.format(DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)) ?: "-"
+    val bestDayLabel = bestDay?.format(DateTimeFormatter.ofPattern("EEE", appLocale)) ?: "-"
 
     CompositionLocalProvider(LocalDensity provides Density(density = density.density, fontScale = 1f)) {
         LazyColumn(
@@ -1633,6 +1942,7 @@ private fun StatsMetricCard(
 
 @Composable
 private fun WeekCaloriesChartCard(weekData: List<Pair<LocalDate, Int>>, target: Int) {
+    val appLocale = localeForLanguage(LocalAppLanguage.current)
     CardBlock(background = Color(0xFF1E1E1E), borderColor = Color(0xFF2A2A2A)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Calories this week", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -1641,7 +1951,7 @@ private fun WeekCaloriesChartCard(weekData: List<Pair<LocalDate, Int>>, target: 
         Spacer(modifier = Modifier.height(6.dp))
         WeekLineChart(
             points = weekData.map { dayEntry ->
-                dayEntry.first.format(DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH)) to dayEntry.second
+                dayEntry.first.format(DateTimeFormatter.ofPattern("EEE", appLocale)) to dayEntry.second
             },
             target = target,
         )
@@ -1890,8 +2200,9 @@ private fun WeekLineChart(
 private fun DailyBreakdownRow(day: LocalDate, kcal: Int, protein: Int, carbs: Int, fat: Int, target: Int) {
     val isOverTarget = target > 0 && kcal > target
     val barProgress = if (target > 0) (kcal.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f
-    val dayLabel = day.format(DateTimeFormatter.ofPattern("EEE", Locale.ENGLISH))
-    val dateLabel = day.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
+    val appLocale = localeForLanguage(LocalAppLanguage.current)
+    val dayLabel = day.format(DateTimeFormatter.ofPattern("EEE", appLocale))
+    val dateLabel = day.format(DateTimeFormatter.ofPattern("MMM d", appLocale))
     val barColor = if (isOverTarget) Danger else Accent
 
     CardBlock(background = Color(0xFF1E1E1E), borderColor = Color(0xFF2A2A2A)) {
@@ -2455,6 +2766,7 @@ private fun NotificationsScreen(
     onSave: (NotificationSettings) -> Unit,
     onBack: () -> Unit,
 ) {
+    val appLanguage = LocalAppLanguage.current
     val context = LocalContext.current
     var customDaysDraft by rememberSaveable { mutableStateOf(settings.weightCustomEveryDays.toString()) }
     var pickingTimeField by rememberSaveable { mutableStateOf<NotificationTimeField?>(null) }
@@ -2595,7 +2907,7 @@ private fun NotificationsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             WeightReminderFrequency.entries.forEach { frequency ->
                                 NotificationChoiceChip(
-                                    label = frequency.label(),
+                                    label = frequency.label(appLanguage),
                                     selected = settings.weightFrequency == frequency,
                                     modifier = Modifier.weight(1f),
                                     onClick = { onSave(settings.copy(weightFrequency = frequency)) },
@@ -2610,7 +2922,7 @@ private fun NotificationsScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 WeekDay.entries.take(4).forEach { day ->
                                     NotificationChoiceChip(
-                                        label = day.label(),
+                                        label = day.label(appLanguage),
                                         selected = settings.weightWeekDays.contains(day),
                                         modifier = Modifier.weight(1f),
                                         onClick = {
@@ -2627,7 +2939,7 @@ private fun NotificationsScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 WeekDay.entries.drop(4).forEach { day ->
                                     NotificationChoiceChip(
-                                        label = day.label(),
+                                        label = day.label(appLanguage),
                                         selected = settings.weightWeekDays.contains(day),
                                         modifier = Modifier.weight(1f),
                                         onClick = {
@@ -3195,16 +3507,6 @@ private fun extractFirstUrl(text: String): String? {
         ?.trimEnd('.', ',', ';')
 }
 
-private fun isApiKeyRelatedError(message: String?): Boolean {
-    val normalized = message?.lowercase(Locale.ROOT)?.trim().orEmpty()
-    if (normalized.isBlank()) return false
-    return normalized.contains("incorrect api key") ||
-        normalized.contains("invalid_api_key") ||
-        normalized.contains("invalid api key") ||
-        normalized.contains("api key is invalid") ||
-        normalized.contains("api key not valid")
-}
-
 @Composable
 private fun ClickableErrorText(
     message: String,
@@ -3212,14 +3514,15 @@ private fun ClickableErrorText(
     modifier: Modifier = Modifier,
     onUrlClick: (String) -> Unit,
 ) {
+    val localizedMessage = localizeLiteralText(message, LocalAppLanguage.current)
     val annotationTag = "error_url"
-    val annotated = remember(message, url) {
-        val start = message.indexOf(url)
+    val annotated = remember(localizedMessage, url) {
+        val start = localizedMessage.indexOf(url)
         if (start < 0) {
-            buildAnnotatedString { append(message) }
+            buildAnnotatedString { append(localizedMessage) }
         } else {
             buildAnnotatedString {
-                append(message.substring(0, start))
+                append(localizedMessage.substring(0, start))
                 pushStringAnnotation(tag = annotationTag, annotation = url)
                 withStyle(
                     SpanStyle(
@@ -3231,7 +3534,7 @@ private fun ClickableErrorText(
                     append(url)
                 }
                 pop()
-                append(message.substring(start + url.length))
+                append(localizedMessage.substring(start + url.length))
             }
         }
     }
@@ -3257,17 +3560,14 @@ private fun formatReminderTime(minutes: Int): String {
 @Composable
 private fun ProfileScreen(
     profile: UserProfile,
-    apiKey: String,
     language: AppLanguage,
     onSaveProfile: (UserProfile) -> Unit,
-    onSaveApiKey: (String) -> Unit,
     onSaveLanguage: (AppLanguage) -> Unit,
     onOpenNotifications: () -> Unit,
     onSignOut: () -> Unit,
 ) {
     var showIdentityDialog by rememberSaveable { mutableStateOf(false) }
     var showBodyDialog by rememberSaveable { mutableStateOf(false) }
-    var showApiDialog by rememberSaveable { mutableStateOf(false) }
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
 
     var identityName by rememberSaveable { mutableStateOf(profile.name) }
@@ -3280,7 +3580,6 @@ private fun ProfileScreen(
     var bodyGoalWeight by rememberSaveable { mutableStateOf(profile.goalWeightKg.toString()) }
     var bodyActivity by rememberSaveable { mutableStateOf(profile.activityLevel) }
 
-    var apiDraftKey by rememberSaveable { mutableStateOf(apiKey) }
     var languageDraft by rememberSaveable { mutableStateOf(language) }
     val resolvedProfileGoal = resolveGoalTypeByWeights(profile.startWeightKg, profile.goalWeightKg)
 
@@ -3290,7 +3589,7 @@ private fun ProfileScreen(
         identityPhotoUriString = uri?.toString()
     }
 
-    LaunchedEffect(profile, apiKey) {
+    LaunchedEffect(profile, language) {
         identityName = profile.name
         identityPhotoUriString = profile.profilePhotoUri
         bodyGender = profile.gender
@@ -3299,7 +3598,6 @@ private fun ProfileScreen(
         bodyStartWeight = profile.startWeightKg.toString()
         bodyGoalWeight = profile.goalWeightKg.toString()
         bodyActivity = profile.activityLevel
-        apiDraftKey = apiKey
         languageDraft = language
     }
 
@@ -3344,7 +3642,7 @@ private fun ProfileScreen(
                             .background(Color(0x1F4CAF50))
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
-                        Text(resolvedProfileGoal.label(), color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(resolvedProfileGoal.label(language), color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -3357,7 +3655,7 @@ private fun ProfileScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatMiniCard("Target", "${profile.dailyTargetCalories} kcal", Modifier.weight(1f))
             StatMiniCard("Weight", "${"%.1f".format(profile.weightKg)} kg", Modifier.weight(1f))
-            StatMiniCard("Activity", profile.activityLevel.label(), Modifier.weight(1f))
+            StatMiniCard("Activity", profile.activityLevel.label(language), Modifier.weight(1f))
         }
 
         CardBlock {
@@ -3368,7 +3666,7 @@ private fun ProfileScreen(
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))
-            ProfileInfoRow("Gender", profile.gender.label())
+            ProfileInfoRow("Gender", profile.gender.label(language))
             ProfileInfoRow("Age", "${profile.age} years")
             ProfileInfoRow("Height", "${profile.heightCm} cm")
             ProfileInfoRow("Starting weight", "${"%.1f".format(profile.startWeightKg)} kg")
@@ -3379,8 +3677,7 @@ private fun ProfileScreen(
             Text("SETTINGS", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(10.dp))
             SettingsRow("Notifications") { onOpenNotifications() }
-            SettingsRow("Language (${language.label()})") { showLanguageDialog = true }
-            SettingsRow("OpenAI API", isLast = true) { showApiDialog = true }
+            SettingsRow("Language (${language.label()})", isLast = true) { showLanguageDialog = true }
         }
 
         Button(
@@ -3515,7 +3812,7 @@ private fun ProfileScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GenderType.entries.forEach { item ->
-                            FilterButton(item.label(), bodyGender == item, Modifier.weight(1f)) { bodyGender = item }
+                            FilterButton(item.label(language), bodyGender == item, Modifier.weight(1f)) { bodyGender = item }
                         }
                     }
 
@@ -3524,7 +3821,7 @@ private fun ProfileScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ActivityLevel.entries.forEach { item ->
-                            FilterButton(item.label(), bodyActivity == item, Modifier.weight(1f)) { bodyActivity = item }
+                            FilterButton(item.label(language), bodyActivity == item, Modifier.weight(1f)) { bodyActivity = item }
                         }
                     }
 
@@ -3552,47 +3849,6 @@ private fun ProfileScreen(
                 }
             }
         }
-    }
-
-    if (showApiDialog) {
-        AlertDialog(
-            onDismissRequest = { showApiDialog = false },
-            containerColor = CardBg,
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
-            title = { Text("OpenAI API key") },
-            text = {
-                OutlinedTextField(
-                    value = apiDraftKey,
-                    onValueChange = { apiDraftKey = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("API key") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Border,
-                        focusedBorderColor = Accent,
-                        unfocusedContainerColor = CardBg,
-                        focusedContainerColor = CardBg,
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedLabelColor = TextMuted,
-                        focusedLabelColor = Accent,
-                    ),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onSaveApiKey(apiDraftKey.trim())
-                        showApiDialog = false
-                    },
-                ) { Text("Save", color = Accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showApiDialog = false }) { Text("Cancel", color = TextSecondary) }
-            },
-        )
     }
 
     if (showLanguageDialog) {
@@ -3671,10 +3927,7 @@ private enum class AddMealMode { PHOTO, PROMPT, MANUAL }
 private fun AddMealScreen(
     isAnalyzing: Boolean,
     analyzeError: String?,
-    initialApiKey: String,
-    isApiKeyMissing: Boolean,
     onDismissError: () -> Unit,
-    onSaveApiKey: (String) -> Unit,
     onBack: () -> Unit,
     onSaveManual: (String, String, Int, Int, Int, Int) -> Unit,
     onAnalyze: (String, String?) -> Unit,
@@ -3690,19 +3943,9 @@ private fun AddMealScreen(
     var carbs by rememberSaveable { mutableStateOf("") }
     var fat by rememberSaveable { mutableStateOf("") }
     var selectedImageUriString by rememberSaveable { mutableStateOf<String?>(null) }
-    var showApiKeyDialog by rememberSaveable { mutableStateOf(false) }
-    var apiDraftKey by rememberSaveable { mutableStateOf(initialApiKey) }
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val selectedImageUri = selectedImageUriString?.let(Uri::parse)
-    val canSaveApiKey = apiDraftKey.trim().isNotEmpty()
     val detectedErrorUrl = remember(analyzeError) { analyzeError?.let(::extractFirstUrl) }
-    val isApiKeyError = remember(analyzeError) { isApiKeyRelatedError(analyzeError) }
-    val showApiKeyAction = isApiKeyMissing || isApiKeyError
-    val apiActionLabel = if (isApiKeyMissing) "Add API Key" else "Change Key"
-
-    LaunchedEffect(initialApiKey) {
-        apiDraftKey = initialApiKey
-    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -3790,23 +4033,6 @@ private fun AddMealScreen(
                                 .background(Color(0x66B71C1C)),
                         ) {
                             Text("×", color = Color.White, fontSize = 16.sp)
-                        }
-                    }
-                    if (showApiKeyAction) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            "You can always edit it later in Profile -> OpenAI API.",
-                            color = TextSecondary,
-                            fontSize = 12.sp,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = { showApiKeyDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                        ) {
-                            Text(apiActionLabel, color = Color.White, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -3967,56 +4193,6 @@ private fun AddMealScreen(
                 }
             }
         }
-    }
-
-    if (showApiKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showApiKeyDialog = false },
-            containerColor = CardBg,
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
-            title = { Text("OpenAI API key") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = apiDraftKey,
-                        onValueChange = { apiDraftKey = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("API key") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        singleLine = true,
-                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                            unfocusedBorderColor = Border,
-                            focusedBorderColor = Accent,
-                            unfocusedContainerColor = CardBg,
-                            focusedContainerColor = CardBg,
-                            unfocusedTextColor = Color.White,
-                            focusedTextColor = Color.White,
-                            unfocusedLabelColor = TextMuted,
-                            focusedLabelColor = Accent,
-                        ),
-                    )
-                    Text(
-                        "You can always change this key later in Profile -> OpenAI API.",
-                        color = TextMuted,
-                        fontSize = 12.sp,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onSaveApiKey(apiDraftKey.trim())
-                        showApiKeyDialog = false
-                        onDismissError()
-                    },
-                    enabled = canSaveApiKey,
-                ) { Text("Save", color = Accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showApiKeyDialog = false }) { Text("Cancel", color = TextSecondary) }
-            },
-        )
     }
 
 }
@@ -4838,14 +5014,14 @@ private fun formatDateMonthDay(timestamp: Long): String {
     return Instant.ofEpochMilli(timestamp)
         .atZone(ZoneId.systemDefault())
         .toLocalDate()
-        .format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
+        .format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
 }
 
 private fun formatMonthName(timestamp: Long): String {
     return Instant.ofEpochMilli(timestamp)
         .atZone(ZoneId.systemDefault())
         .toLocalDate()
-        .format(DateTimeFormatter.ofPattern("MMMM", Locale.ENGLISH))
+        .format(DateTimeFormatter.ofPattern("MMMM", Locale.getDefault()))
 }
 
 private fun formatWeightAxisValue(value: Float): String {

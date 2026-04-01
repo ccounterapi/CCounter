@@ -35,10 +35,18 @@ object OpenAiMealAnalyzer {
         apiKey: String,
         description: String,
         imageDataUrl: String?,
+        language: AppLanguage = AppLanguage.ENGLISH,
     ): Result<AiMealDraft> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
-                IllegalArgumentException("Add your OpenAI API key in Profile first."),
+                IllegalArgumentException(
+                    tr(
+                        language,
+                        "AI key is not configured by admin. Please contact admin.",
+                        "AI ключ не настроен администратором. Обратитесь к администратору.",
+                        "AI ключ не налаштований адміністратором. Зверніться до адміністратора.",
+                    ),
+                ),
             )
         }
 
@@ -104,7 +112,7 @@ object OpenAiMealAnalyzer {
             val content = extractAssistantContent(responseText)
             val parsed = JSONObject(cleanJson(content))
 
-            val items = parsed.optJSONArray("items")?.toMealItems().orEmpty()
+            val items = parsed.optJSONArray("items")?.toMealItems(language).orEmpty()
             val total = parsed.optInt("total_kcal").takeIf { it > 0 }
                 ?: items.sumOf { it.kcal }.coerceAtLeast(50)
 
@@ -120,7 +128,7 @@ object OpenAiMealAnalyzer {
             )
             Result.success(draft)
         } catch (error: Throwable) {
-            Result.failure(error.toUserFacingAnalyzerError())
+            Result.failure(error.toUserFacingAnalyzerError(language))
         }
     }
 
@@ -128,10 +136,18 @@ object OpenAiMealAnalyzer {
         apiKey: String,
         productName: String,
         grams: Int,
+        language: AppLanguage = AppLanguage.ENGLISH,
     ): Result<ComponentCaloriesEstimate> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
-                IllegalArgumentException("Add your OpenAI API key in Profile first."),
+                IllegalArgumentException(
+                    tr(
+                        language,
+                        "AI key is not configured by admin. Please contact admin.",
+                        "AI ключ не настроен администратором. Обратитесь к администратору.",
+                        "AI ключ не налаштований адміністратором. Зверніться до адміністратора.",
+                    ),
+                ),
             )
         }
 
@@ -213,11 +229,11 @@ object OpenAiMealAnalyzer {
                 ),
             )
         } catch (error: Throwable) {
-            Result.failure(error.toUserFacingAnalyzerError())
+            Result.failure(error.toUserFacingAnalyzerError(language))
         }
     }
 
-    private fun JSONArray.toMealItems(): List<MealItem> {
+    private fun JSONArray.toMealItems(language: AppLanguage): List<MealItem> {
         return buildList {
             for (index in 0 until length()) {
                 val obj = optJSONObject(index) ?: continue
@@ -231,7 +247,14 @@ object OpenAiMealAnalyzer {
                 }
                 add(
                     MealItem(
-                        name = normalizedName.ifBlank { "Item ${index + 1}" },
+                        name = normalizedName.ifBlank {
+                            tr(
+                                language,
+                                "Item ${index + 1}",
+                                "Компонент ${index + 1}",
+                                "Компонент ${index + 1}",
+                            )
+                        },
                         grams = normalizedGrams,
                         kcal = obj.optInt("kcal").coerceAtLeast(0),
                         confidence = "High",
@@ -301,17 +324,38 @@ object OpenAiMealAnalyzer {
             .trim()
     }
 
-    private fun Throwable.toUserFacingAnalyzerError(): Throwable {
+    private fun Throwable.toUserFacingAnalyzerError(language: AppLanguage): Throwable {
         if (isNoInternetConnectionError()) {
-            return IllegalStateException("No Internet Connection. Please check your internet and try again.")
+            return IllegalStateException(
+                tr(
+                    language,
+                    "No Internet Connection. Please check your internet and try again.",
+                    "Нет подключения к интернету. Проверьте интернет и попробуйте снова.",
+                    "Немає підключення до інтернету. Перевірте інтернет і спробуйте ще раз.",
+                ),
+            )
         }
         if (this is SocketTimeoutException) {
-            return IllegalStateException("Request timed out. Please check your internet and try again.")
+            return IllegalStateException(
+                tr(
+                    language,
+                    "Request timed out. Please check your internet and try again.",
+                    "Время ожидания запроса истекло. Проверьте интернет и попробуйте снова.",
+                    "Час очікування запиту вичерпано. Перевірте інтернет і спробуйте ще раз.",
+                ),
+            )
         }
         if (this is IllegalArgumentException || this is IllegalStateException) {
             return this
         }
-        return IllegalStateException(message?.takeIf { it.isNotBlank() } ?: "Failed to analyze meal. Try again.")
+        return IllegalStateException(
+            message?.takeIf { it.isNotBlank() } ?: tr(
+                language,
+                "Failed to analyze meal. Try again.",
+                "Не удалось проанализировать прием пищи. Попробуйте снова.",
+                "Не вдалося проаналізувати прийом їжі. Спробуйте ще раз.",
+            ),
+        )
     }
 
     private fun Throwable.isNoInternetConnectionError(): Boolean {
@@ -328,5 +372,11 @@ object OpenAiMealAnalyzer {
             current = current.cause
         }
         return false
+    }
+
+    private fun tr(language: AppLanguage, en: String, ru: String, uk: String): String = when (language) {
+        AppLanguage.ENGLISH -> en
+        AppLanguage.RUSSIAN -> ru
+        AppLanguage.UKRAINIAN -> uk
     }
 }

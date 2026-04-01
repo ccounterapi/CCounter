@@ -7,7 +7,20 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <main class="container">
+  <div id="lockScreen" class="lock-screen">
+    <section class="lock-card">
+      <h1>CCounter Admin</h1>
+      <p>Enter admin password to continue.</p>
+      <form id="unlockForm" class="lock-form" autocomplete="off">
+        <label for="unlockInput">Password</label>
+        <input id="unlockInput" type="password" placeholder="Enter password" autocomplete="off" />
+        <button type="submit" class="btn btn-primary">Unlock</button>
+      </form>
+      <p id="unlockError" class="lock-error" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <main id="adminApp" class="container hidden">
     <header class="top">
       <h1>CCounter Admin</h1>
       <p>Device access control panel (GitHub Pages)</p>
@@ -39,6 +52,13 @@
           <input id="pathInput" type="text" value="admin/devices.json" />
         </label>
       </div>
+      <div class="grid">
+        <label>
+          OpenAI API key (admin only)
+          <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+        </label>
+      </div>
+      <p class="muted">The key is saved to JSON only in encoded format: <code>base63-no-z</code>.</p>
       <div class="actions">
         <button id="loadBtn" class="btn">Load</button>
         <button id="saveBtn" class="btn btn-primary">Save Changes</button>
@@ -62,4 +82,3 @@
   <script src="./panel.js"></script>
 </body>
 </html>
-

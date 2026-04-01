@@ -29,6 +29,7 @@ object RemotePolicyService {
 
     @Serializable
     private data class DeviceRegistry(
+        @SerialName("openAiApiKeyBase63NoZ") val openAiApiKeyBase63NoZ: String = "",
         val devices: List<RemoteDeviceRecord> = emptyList(),
     )
 
@@ -49,6 +50,7 @@ object RemotePolicyService {
         val expiresAtUtcMillis: Long?,
         val message: String,
         val checkedAtUtcMillis: Long,
+        val openAiApiKeyBase63NoZ: String,
     )
 
     suspend fun fetchNetworkUtcNowMillis(): Result<Long> = withContext(Dispatchers.IO) {
@@ -101,6 +103,7 @@ object RemotePolicyService {
                     expiresAtUtcMillis = null,
                     message = "Device is pending approval in admin panel.",
                     checkedAtUtcMillis = nowUtcMillis,
+                    openAiApiKeyBase63NoZ = registry.openAiApiKeyBase63NoZ.trim(),
                 )
             }
 
@@ -132,6 +135,7 @@ object RemotePolicyService {
                 expiresAtUtcMillis = expiresAtMillis,
                 message = message,
                 checkedAtUtcMillis = nowUtcMillis,
+                openAiApiKeyBase63NoZ = registry.openAiApiKeyBase63NoZ.trim(),
             )
         }
     }
@@ -214,4 +218,3 @@ object RemotePolicyService {
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
     }
 }
-

@@ -1,21 +1,94 @@
 (function () {
+  const ADMIN_PASSWORD_SHA256 = "1efe63f6225e2bdfcd621d644e5bd06b12a6329f546085092c7a7c81990544ce";
+
   const state = {
     sha: "",
     devices: [],
     pending: [],
+    encodedApiKey: "",
   };
+  let unlocked = false;
+
+  const BASE63_NO_Z_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy0123456789+/";
+  const BASE63_NO_Z_BASE = 63n;
+
+  const lockScreen = document.getElementById("lockScreen");
+  const unlockForm = document.getElementById("unlockForm");
+  const unlockInput = document.getElementById("unlockInput");
+  const unlockError = document.getElementById("unlockError");
+  const adminApp = document.getElementById("adminApp");
 
   const tokenInput = document.getElementById("tokenInput");
   const ownerInput = document.getElementById("ownerInput");
   const repoInput = document.getElementById("repoInput");
   const branchInput = document.getElementById("branchInput");
   const pathInput = document.getElementById("pathInput");
+  const apiKeyInput = document.getElementById("apiKeyInput");
   const statusText = document.getElementById("statusText");
   const pendingWrap = document.getElementById("pendingWrap");
   const devicesWrap = document.getElementById("devicesWrap");
 
+  unlockForm.addEventListener("submit", handleUnlock);
   document.getElementById("loadBtn").addEventListener("click", loadAll);
   document.getElementById("saveBtn").addEventListener("click", saveAll);
+  setLocked(true);
+
+  function setLocked(locked) {
+    unlocked = !locked;
+    if (locked) {
+      if (adminApp) adminApp.classList.add("hidden");
+      if (lockScreen) lockScreen.classList.remove("hidden");
+      if (unlockInput) unlockInput.value = "";
+      if (unlockError) unlockError.textContent = "";
+      if (tokenInput) tokenInput.value = "";
+      if (apiKeyInput) apiKeyInput.value = "";
+      if (statusText) statusText.textContent = "";
+      state.sha = "";
+      state.devices = [];
+      state.pending = [];
+      if (pendingWrap) pendingWrap.innerHTML = "";
+      if (devicesWrap) devicesWrap.innerHTML = "";
+      setTimeout(() => unlockInput && unlockInput.focus(), 0);
+      return;
+    }
+    if (lockScreen) lockScreen.classList.add("hidden");
+    if (adminApp) adminApp.classList.remove("hidden");
+    setTimeout(() => tokenInput && tokenInput.focus(), 0);
+  }
+
+  async function sha256Hex(value) {
+    const data = new TextEncoder().encode(value);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function handleUnlock(event) {
+    event.preventDefault();
+    const password = String(unlockInput ? unlockInput.value : "");
+    if (!password) {
+      if (unlockError) unlockError.textContent = "Enter password.";
+      return;
+    }
+    if (!window.crypto || !window.crypto.subtle) {
+      if (unlockError) unlockError.textContent = "This browser does not support secure unlock.";
+      return;
+    }
+    try {
+      const hash = await sha256Hex(password);
+      if (hash !== ADMIN_PASSWORD_SHA256) {
+        if (unlockError) unlockError.textContent = "Incorrect password.";
+        if (unlockInput) {
+          unlockInput.value = "";
+          unlockInput.focus();
+        }
+        return;
+      }
+      setLocked(false);
+    } catch (_error) {
+      if (unlockError) unlockError.textContent = "Unlock failed. Try again.";
+    }
+  }
 
   function setStatus(text, isError) {
     statusText.textContent = text;
@@ -53,6 +126,43 @@
     return btoa(raw);
   }
 
+  function encodeBase63NoZ(text) {
+    const source = String(text || "");
+    if (!source) return "";
+    const bytes = new TextEncoder().encode(source);
+    let value = 0n;
+    for (let i = 0; i < bytes.length; i += 1) {
+      value = (value << 8n) + BigInt(bytes[i]);
+    }
+    if (value === 0n) return BASE63_NO_Z_ALPHABET[0];
+    let encoded = "";
+    while (value > 0n) {
+      const remainder = Number(value % BASE63_NO_Z_BASE);
+      encoded = BASE63_NO_Z_ALPHABET[remainder] + encoded;
+      value /= BASE63_NO_Z_BASE;
+    }
+    return encoded;
+  }
+
+  function decodeBase63NoZ(encoded) {
+    const source = String(encoded || "").trim();
+    if (!source) return "";
+    let value = 0n;
+    for (let i = 0; i < source.length; i += 1) {
+      const idx = BASE63_NO_Z_ALPHABET.indexOf(source[i]);
+      if (idx < 0) throw new Error("Encoded API key contains unsupported symbols.");
+      value = value * BASE63_NO_Z_BASE + BigInt(idx);
+    }
+    if (value === 0n) return "";
+    const bytes = [];
+    while (value > 0n) {
+      bytes.push(Number(value & 255n));
+      value >>= 8n;
+    }
+    bytes.reverse();
+    return new TextDecoder().decode(Uint8Array.from(bytes));
+  }
+
   function parseIssueBody(body) {
     const text = String(body || "");
     const find = (regex) => {
@@ -86,6 +196,10 @@
   }
 
   async function loadAll() {
+    if (!unlocked) {
+      setStatus("Panel is locked.", true);
+      return;
+    }
     try {
       setStatus("Loading...", false);
       const { owner, repo, branch, path } = getRepoParts();
@@ -98,6 +212,19 @@
       state.sha = contentJson.sha || "";
       const parsed = JSON.parse(decodeBase64Utf8(contentJson.content || ""));
       state.devices = Array.isArray(parsed.devices) ? parsed.devices : [];
+      state.encodedApiKey = String(parsed.openAiApiKeyBase63NoZ || "").trim();
+      if (apiKeyInput) {
+        if (state.encodedApiKey) {
+          try {
+            apiKeyInput.value = decodeBase63NoZ(state.encodedApiKey);
+          } catch (_error) {
+            apiKeyInput.value = "";
+            setStatus("Loaded devices, but encoded API key could not be decoded. Update it and save again.", true);
+          }
+        } else {
+          apiKeyInput.value = "";
+        }
+      }
 
       const issuesUrl = `https://api.github.com/repos/${owner}/${repo}/issues?state=open&labels=device-registration&per_page=100`;
       const issuesResp = await fetch(issuesUrl, { headers: ghHeaders() });
@@ -283,6 +410,10 @@
   }
 
   async function saveAll() {
+    if (!unlocked) {
+      setStatus("Panel is locked.", true);
+      return;
+    }
     try {
       setStatus("Saving...", false);
       const token = tokenInput.value.trim();
@@ -292,6 +423,7 @@
       const { owner, repo, branch, path } = getRepoParts();
       const payloadObject = {
         updatedAtUtc: new Date().toISOString(),
+        openAiApiKeyBase63NoZ: encodeBase63NoZ(apiKeyInput ? apiKeyInput.value.trim() : ""),
         devices: state.devices.map((item) => ({
           deviceId: String(item.deviceId || "").trim(),
           profileName: String(item.profileName || "User").trim(),
@@ -342,4 +474,3 @@
     return escapeHtml(text).replaceAll("`", "&#96;");
   }
 })();
-

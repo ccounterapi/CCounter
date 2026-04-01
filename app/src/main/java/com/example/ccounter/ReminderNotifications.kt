@@ -242,18 +242,25 @@ object ReminderScheduler {
 }
 
 private object ReminderNotifier {
+    private fun tr(language: AppLanguage, en: String, ru: String, uk: String): String = when (language) {
+        AppLanguage.ENGLISH -> en
+        AppLanguage.RUSSIAN -> ru
+        AppLanguage.UKRAINIAN -> uk
+    }
+
     private fun defaultSoundUri() = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
     fun ensureChannels(context: Context) {
+        val language = AppStorage(context).load().language
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (manager.getNotificationChannel(CHANNEL_DEFAULT) != null) return
         val channel = NotificationChannel(
             CHANNEL_DEFAULT,
-            "CCounter reminders",
+            tr(language, "CCounter reminders", "Напоминания CCounter", "Нагадування CCounter"),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Meal and weight reminders"
+            description = tr(language, "Meal and weight reminders", "Напоминания о еде и весе", "Нагадування про їжу та вагу")
             enableVibration(true)
             setSound(
                 defaultSoundUri(),
@@ -268,12 +275,29 @@ private object ReminderNotifier {
 
     fun show(context: Context, type: ReminderType) {
         ensureChannels(context)
+        val language = AppStorage(context).load().language
 
         val (title, body, route) = when (type) {
-            ReminderType.BREAKFAST -> Triple(breakfastTitles.random(), "Send a photo of your breakfast", Routes.AddMeal)
-            ReminderType.LUNCH -> Triple(lunchTitles.random(), "Send a photo of your lunch", Routes.AddMeal)
-            ReminderType.DINNER -> Triple(dinnerTitles.random(), "Send a photo of your dinner", Routes.AddMeal)
-            ReminderType.WEIGHT -> Triple(weightTitles.random(), "Update your current weight", Routes.Weight)
+            ReminderType.BREAKFAST -> Triple(
+                breakfastTitles(language).random(),
+                tr(language, "Send a photo of your breakfast", "Отправьте фото вашего завтрака", "Надішліть фото вашого сніданку"),
+                Routes.AddMeal,
+            )
+            ReminderType.LUNCH -> Triple(
+                lunchTitles(language).random(),
+                tr(language, "Send a photo of your lunch", "Отправьте фото вашего обеда", "Надішліть фото вашого обіду"),
+                Routes.AddMeal,
+            )
+            ReminderType.DINNER -> Triple(
+                dinnerTitles(language).random(),
+                tr(language, "Send a photo of your dinner", "Отправьте фото вашего ужина", "Надішліть фото вашої вечері"),
+                Routes.AddMeal,
+            )
+            ReminderType.WEIGHT -> Triple(
+                weightTitles(language).random(),
+                tr(language, "Update your current weight", "Обновите ваш текущий вес", "Оновіть вашу поточну вагу"),
+                Routes.Weight,
+            )
         }
 
         val contentIntent = Intent(context, MainActivity::class.java).apply {
@@ -302,45 +326,125 @@ private object ReminderNotifier {
         manager.notify(type.notificationId, notification)
     }
 
-    private val breakfastTitles = listOf(
-        "Good morning, time for something tasty 🍳",
-        "Start your day with a nice meal ☀️",
-        "Breakfast time, don’t skip it 🥐",
-        "Treat yourself to a good morning bite 🍓",
-        "A fresh start begins with breakfast 🥣",
-        "Take a moment to enjoy your morning food 🍞",
-        "Your morning energy starts here 🍌",
-    )
+    private fun breakfastTitles(language: AppLanguage): List<String> = when (language) {
+        AppLanguage.ENGLISH -> listOf(
+            "Good morning, time for something tasty 🍳",
+            "Start your day with a nice meal ☀️",
+            "Breakfast time, don’t skip it 🥐",
+            "Treat yourself to a good morning bite 🍓",
+            "A fresh start begins with breakfast 🥣",
+            "Take a moment to enjoy your morning food 🍞",
+            "Your morning energy starts here 🍌",
+        )
+        AppLanguage.RUSSIAN -> listOf(
+            "Доброе утро, время чего-то вкусного 🍳",
+            "Начните день с приятного приема пищи ☀️",
+            "Время завтрака, не пропускайте его 🥐",
+            "Порадуйте себя утренним перекусом 🍓",
+            "Свежий старт начинается с завтрака 🥣",
+            "Насладитесь утренней едой 🍞",
+            "Ваша утренняя энергия начинается здесь 🍌",
+        )
+        AppLanguage.UKRAINIAN -> listOf(
+            "Доброго ранку, час для чогось смачного 🍳",
+            "Почніть день з приємного прийому їжі ☀️",
+            "Час сніданку, не пропускайте його 🥐",
+            "Потіште себе ранковим перекусом 🍓",
+            "Свіжий старт починається зі сніданку 🥣",
+            "Насолодіться ранковою їжею 🍞",
+            "Ваша ранкова енергія починається тут 🍌",
+        )
+    }
 
-    private val lunchTitles = listOf(
-        "Time to take a break and eat something good 🥗",
-        "Lunch is a perfect moment to recharge 🍜",
-        "Don’t forget to enjoy your midday meal 🥪",
-        "A good lunch keeps you going strong 🍛",
-        "Take a pause and grab something tasty 🍝",
-        "Give yourself a proper lunch break 🍗",
-        "A little food boost for your day 🥙",
-    )
+    private fun lunchTitles(language: AppLanguage): List<String> = when (language) {
+        AppLanguage.ENGLISH -> listOf(
+            "Time to take a break and eat something good 🥗",
+            "Lunch is a perfect moment to recharge 🍜",
+            "Don’t forget to enjoy your midday meal 🥪",
+            "A good lunch keeps you going strong 🍛",
+            "Take a pause and grab something tasty 🍝",
+            "Give yourself a proper lunch break 🍗",
+            "A little food boost for your day 🥙",
+        )
+        AppLanguage.RUSSIAN -> listOf(
+            "Время сделать паузу и поесть что-то вкусное 🥗",
+            "Обед — отличный момент перезагрузиться 🍜",
+            "Не забудьте про дневной прием пищи 🥪",
+            "Хороший обед поддержит вашу энергию 🍛",
+            "Сделайте паузу и перекусите вкусно 🍝",
+            "Подарите себе полноценный обеденный перерыв 🍗",
+            "Небольшой пищевой буст для вашего дня 🥙",
+        )
+        AppLanguage.UKRAINIAN -> listOf(
+            "Час зробити паузу й зʼїсти щось смачне 🥗",
+            "Обід — ідеальний момент перезавантажитися 🍜",
+            "Не забудьте про денний прийом їжі 🥪",
+            "Хороший обід підтримує вашу енергію 🍛",
+            "Зробіть паузу та перекусіть смачно 🍝",
+            "Подаруйте собі повноцінну обідню перерву 🍗",
+            "Невеликий харчовий буст для вашого дня 🥙",
+        )
+    }
 
-    private val dinnerTitles = listOf(
-        "Time to relax and enjoy your dinner 🍲",
-        "End your day with something вкусное 🍖",
-        "Dinner is ready when you are 🌙",
-        "A calm evening starts with a good meal 🥩",
-        "Take your time and enjoy dinner 🍜",
-        "A warm meal to finish your day 🍛",
-        "Make your evening a bit tastier 🍗",
-    )
+    private fun dinnerTitles(language: AppLanguage): List<String> = when (language) {
+        AppLanguage.ENGLISH -> listOf(
+            "Time to relax and enjoy your dinner 🍲",
+            "End your day with something delicious 🍖",
+            "Dinner is ready when you are 🌙",
+            "A calm evening starts with a good meal 🥩",
+            "Take your time and enjoy dinner 🍜",
+            "A warm meal to finish your day 🍛",
+            "Make your evening a bit tastier 🍗",
+        )
+        AppLanguage.RUSSIAN -> listOf(
+            "Время расслабиться и насладиться ужином 🍲",
+            "Завершите день чем-то вкусным 🍖",
+            "Ужин готов, когда будете готовы вы 🌙",
+            "Спокойный вечер начинается с хорошего ужина 🥩",
+            "Не спешите и наслаждайтесь ужином 🍜",
+            "Теплый прием пищи в завершение дня 🍛",
+            "Сделайте вечер немного вкуснее 🍗",
+        )
+        AppLanguage.UKRAINIAN -> listOf(
+            "Час розслабитися та насолодитися вечерею 🍲",
+            "Завершіть день чимось смачним 🍖",
+            "Вечеря готова, коли будете готові ви 🌙",
+            "Спокійний вечір починається з хорошої вечері 🥩",
+            "Не поспішайте та насолоджуйтеся вечерею 🍜",
+            "Теплий прийом їжі для завершення дня 🍛",
+            "Зробіть вечір трохи смачнішим 🍗",
+        )
+    }
 
-    private val weightTitles = listOf(
-        "A small check-in for today ⚖️",
-        "See how you’re doing today 📊",
-        "A quick moment for yourself ⚖️",
-        "Stay in touch with your progress 🧭",
-        "Just a gentle reminder for today ⚖️",
-        "Keep an eye on your journey 📉",
-        "A simple step towards your goal ⚖️",
-    )
+    private fun weightTitles(language: AppLanguage): List<String> = when (language) {
+        AppLanguage.ENGLISH -> listOf(
+            "A small check-in for today ⚖️",
+            "See how you’re doing today 📊",
+            "A quick moment for yourself ⚖️",
+            "Stay in touch with your progress 🧭",
+            "Just a gentle reminder for today ⚖️",
+            "Keep an eye on your journey 📉",
+            "A simple step towards your goal ⚖️",
+        )
+        AppLanguage.RUSSIAN -> listOf(
+            "Небольшая проверка на сегодня ⚖️",
+            "Посмотрите, как у вас сегодня дела 📊",
+            "Короткий момент для себя ⚖️",
+            "Оставайтесь на связи со своим прогрессом 🧭",
+            "Нежное напоминание на сегодня ⚖️",
+            "Следите за своим путем 📉",
+            "Простой шаг к вашей цели ⚖️",
+        )
+        AppLanguage.UKRAINIAN -> listOf(
+            "Невелика перевірка на сьогодні ⚖️",
+            "Подивіться, як у вас сьогодні справи 📊",
+            "Короткий момент для себе ⚖️",
+            "Тримайте звʼязок зі своїм прогресом 🧭",
+            "Легке нагадування на сьогодні ⚖️",
+            "Слідкуйте за своїм шляхом 📉",
+            "Простий крок до вашої цілі ⚖️",
+        )
+    }
 }
 
 private fun WeekDay.toJavaDayOfWeek(): DayOfWeek = when (this) {

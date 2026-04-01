@@ -5,6 +5,7 @@
 - Lets admin approve a device for 30 days.
 - Lets admin pause/resume access.
 - Lets admin edit expiration date and time.
+- Lets admin set OpenAI API key once (stored in JSON as `base63-no-z` encoded value).
 - Saves access list to `admin/devices.json` in this repository.
 
 ## Hosting on GitHub Pages
@@ -27,4 +28,3 @@ Token permissions needed on the repo:
 - Contents: Read
 
 Then rebuild APK.
-
