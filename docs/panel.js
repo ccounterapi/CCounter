@@ -204,10 +204,7 @@
 
   async function fetchContentMetadata(owner, repo, branch, path) {
     const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}&_ts=${Date.now()}-${Math.random()}`;
-    const contentResp = await fetch(contentUrl, {
-      headers: ghHeaders(false),
-      cache: "no-store",
-    });
+    const contentResp = await fetch(contentUrl, { headers: ghHeaders(false) });
     if (!contentResp.ok) throw new Error(`Failed to load devices JSON (${contentResp.status}).`);
     return contentResp.json();
   }
@@ -241,7 +238,7 @@
       }
 
       const issuesUrl = `https://api.github.com/repos/${owner}/${repo}/issues?state=open&labels=device-registration&per_page=100`;
-      const issuesResp = await fetch(issuesUrl, { headers: ghHeaders(false), cache: "no-store" });
+      const issuesResp = await fetch(issuesUrl, { headers: ghHeaders(false) });
       if (!issuesResp.ok) throw new Error(`Failed to load registration issues (${issuesResp.status}).`);
       const issues = await issuesResp.json();
 
