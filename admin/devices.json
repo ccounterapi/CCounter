@@ -1,5 +1,26 @@
 {
-  "updatedAtUtc": "2026-04-01T16:05:38.164Z",
+  "updatedAtUtc": "2026-04-01T17:02:54.713Z",
   "openAiApiKeyBase63NoZ": "DibYR0Cm3YJ1Qp4/U6k1nkVXF61dKDJQvGkGoxGk6yX5Ad6I+TUsd1Bwo3wqrqkfmbu5gPcCTxvO+l3N1Re7G4lwe/rfEjfOhnkJ8mHanlg7furqbJchCk9gvQnRS6OFfDsdHknm+hH7uCdAv8rGovXUbDguxH4dnaOpIRxRYriVu5yeqM+Gsx3y+DOo3mAYFjn0xjXa4Lk97qKTPRQDh6x+y41c",
-  "devices": []
+  "devices": [
+    {
+      "deviceId": "56a17bef-5dae-4102-9b8e-0c9b47934328",
+      "profileName": "Лащчкч",
+      "language": "Русский",
+      "accessEnabled": true,
+      "paused": false,
+      "expiresAtUtc": "2026-05-01T17:02:18.066Z",
+      "createdAtUtc": "2026-04-01T17:02:18.066Z",
+      "updatedAtUtc": "2026-04-01T17:02:54.714Z"
+    },
+    {
+      "deviceId": "5c294705-68b9-4b4f-b816-53cf42c54ed3",
+      "profileName": "BrayanMist",
+      "language": "Русский",
+      "accessEnabled": true,
+      "paused": false,
+      "expiresAtUtc": "2026-05-01T17:02:24.365Z",
+      "createdAtUtc": "2026-04-01T17:02:24.365Z",
+      "updatedAtUtc": "2026-04-01T17:02:54.714Z"
+    }
+  ]
 }
