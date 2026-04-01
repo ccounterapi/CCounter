@@ -195,6 +195,13 @@
     return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
+  async function fetchContentMetadata(owner, repo, branch, path) {
+    const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
+    const contentResp = await fetch(contentUrl, { headers: ghHeaders() });
+    if (!contentResp.ok) throw new Error(`Failed to load devices JSON (${contentResp.status}).`);
+    return contentResp.json();
+  }
+
   async function loadAll() {
     if (!unlocked) {
       setStatus("Panel is locked.", true);
@@ -205,10 +212,7 @@
       const { owner, repo, branch, path } = getRepoParts();
       if (!tokenInput.value.trim()) throw new Error("Enter GitHub token first.");
 
-      const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
-      const contentResp = await fetch(contentUrl, { headers: ghHeaders() });
-      if (!contentResp.ok) throw new Error(`Failed to load devices JSON (${contentResp.status}).`);
-      const contentJson = await contentResp.json();
+      const contentJson = await fetchContentMetadata(owner, repo, branch, path);
       state.sha = contentJson.sha || "";
       const parsed = JSON.parse(decodeBase64Utf8(contentJson.content || ""));
       state.devices = Array.isArray(parsed.devices) ? parsed.devices : [];
@@ -444,16 +448,36 @@
         branch,
       };
 
-      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-      const resp = await fetch(url, {
-        method: "PUT",
-        headers: ghHeaders(),
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`Save failed (${resp.status}): ${text}`);
+      const saveRequest = async () => {
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+        const resp = await fetch(url, {
+          method: "PUT",
+          headers: ghHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          const error = new Error(`Save failed (${resp.status}): ${text}`);
+          error.statusCode = resp.status;
+          throw error;
+        }
+      };
+
+      try {
+        await saveRequest();
+      } catch (error) {
+        if (error && error.statusCode === 409) {
+          const latest = await fetchContentMetadata(owner, repo, branch, path);
+          state.sha = latest.sha || "";
+          body.sha = state.sha;
+          await saveRequest();
+          setStatus("Saved successfully. Conflict resolved automatically.", false);
+          await loadAll();
+          return;
+        }
+        throw error;
       }
+
       setStatus("Saved successfully.", false);
       await loadAll();
     } catch (error) {
