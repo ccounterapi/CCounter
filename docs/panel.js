@@ -95,13 +95,16 @@
     statusText.style.color = isError ? "#ff5252" : "#9e9e9e";
   }
 
-  function ghHeaders() {
+  function ghHeaders(includeContentType = true) {
     const token = tokenInput.value.trim();
-    return {
+    const headers = {
       "Accept": "application/vnd.github+json",
       "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
     };
+    if (includeContentType) {
+      headers["Content-Type"] = "application/json";
+    }
+    return headers;
   }
 
   function getRepoParts() {
@@ -202,11 +205,7 @@
   async function fetchContentMetadata(owner, repo, branch, path) {
     const contentUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}&_ts=${Date.now()}-${Math.random()}`;
     const contentResp = await fetch(contentUrl, {
-      headers: {
-        ...ghHeaders(),
-        "Cache-Control": "no-cache, no-store, max-age=0",
-        "Pragma": "no-cache",
-      },
+      headers: ghHeaders(false),
       cache: "no-store",
     });
     if (!contentResp.ok) throw new Error(`Failed to load devices JSON (${contentResp.status}).`);
@@ -242,7 +241,7 @@
       }
 
       const issuesUrl = `https://api.github.com/repos/${owner}/${repo}/issues?state=open&labels=device-registration&per_page=100`;
-      const issuesResp = await fetch(issuesUrl, { headers: ghHeaders() });
+      const issuesResp = await fetch(issuesUrl, { headers: ghHeaders(false), cache: "no-store" });
       if (!issuesResp.ok) throw new Error(`Failed to load registration issues (${issuesResp.status}).`);
       const issues = await issuesResp.json();
 
@@ -262,7 +261,12 @@
       renderDevices();
       setStatus(`Loaded ${state.devices.length} devices and ${state.pending.length} pending requests.`, false);
     } catch (error) {
-      setStatus(error.message || String(error), true);
+      const message = (error && error.message) ? String(error.message) : String(error);
+      if (/failed to fetch/i.test(message)) {
+        setStatus("Failed to fetch. Check internet/VPN/adblock and ensure token has repository access.", true);
+      } else {
+        setStatus(message, true);
+      }
     }
   }
 
@@ -462,7 +466,7 @@
         const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
         const resp = await fetch(url, {
           method: "PUT",
-          headers: ghHeaders(),
+          headers: ghHeaders(true),
           body: JSON.stringify(body),
         });
         if (resp.ok) return;
@@ -525,7 +529,12 @@
       }
       throw lastError || new Error("Save failed due to repeated SHA conflicts. Please try again.");
     } catch (error) {
-      setStatus(error.message || String(error), true);
+      const message = (error && error.message) ? String(error.message) : String(error);
+      if (/failed to fetch/i.test(message)) {
+        setStatus("Failed to fetch. Check internet/VPN/adblock and ensure token has repository access.", true);
+      } else {
+        setStatus(message, true);
+      }
     }
   }
 
