@@ -1,17 +1,7 @@
 {
-  "updatedAtUtc": "2026-04-02T19:33:52.847Z",
+  "updatedAtUtc": "2026-04-02T19:34:25.722Z",
   "openAiApiKeyBase63NoZ": "DibYR0Cm3YJ1Qp4/U6k1nkVXF61dKDJQvGkGoxGk6yX5Ad6I+TUsd1Bwo3wqrqkfmbu5gPcCTxvO+l3N1Re7G4lwe/rfEjfOhnkJ8mHanlg7furqbJchCk9gvQnRS6OFfDsdHknm+hH7uCdAv8rGovXUbDguxH4dnaOpIRxRYriVu5yeqM+Gsx3y+DOo3mAYFjn0xjXa4Lk97qKTPRQDh6x+y41c",
   "devices": [
-    {
-      "deviceId": "56a17bef-5dae-4102-9b8e-0c9b47934328",
-      "profileName": "DenverSvift",
-      "language": "Русский",
-      "accessEnabled": true,
-      "paused": false,
-      "expiresAtUtc": "2026-05-01T18:45:47.078Z",
-      "createdAtUtc": "2026-04-01T18:45:47.078Z",
-      "updatedAtUtc": "2026-04-02T19:33:52.847Z"
-    },
     {
       "deviceId": "d61add47-eadf-4fc2-972d-1146560366ad",
       "profileName": "DenverSwift",
@@ -20,7 +10,7 @@
       "paused": false,
       "expiresAtUtc": "2026-05-02T16:02:03.795Z",
       "createdAtUtc": "2026-04-02T16:02:03.795Z",
-      "updatedAtUtc": "2026-04-02T19:33:52.847Z"
+      "updatedAtUtc": "2026-04-02T19:34:25.723Z"
     },
     {
       "deviceId": "2d154e7a-9856-4b36-bb03-bf0f552276ef",
@@ -30,7 +20,7 @@
       "paused": false,
       "expiresAtUtc": "2026-05-02T19:33:48.730Z",
       "createdAtUtc": "2026-04-02T19:33:48.730Z",
-      "updatedAtUtc": "2026-04-02T19:33:52.847Z"
+      "updatedAtUtc": "2026-04-02T19:34:25.723Z"
     }
   ]
 }
