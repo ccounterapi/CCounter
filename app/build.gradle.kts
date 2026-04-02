@@ -13,6 +13,44 @@ val localProps = Properties().apply {
     }
 }
 
+fun resolveConfigValue(
+    key: String,
+    localProps: Properties,
+    envKey: String? = null,
+): String {
+    return (
+        (project.findProperty(key) as String?)
+            ?: localProps.getProperty(key)
+            ?: envKey?.let { System.getenv(it) }
+            ?: ""
+        ).trim()
+}
+
+val releaseStoreFilePath = resolveConfigValue(
+    key = "ccounter.release.storeFile",
+    localProps = localProps,
+    envKey = "CCOUNTER_RELEASE_STORE_FILE",
+)
+val releaseStorePassword = resolveConfigValue(
+    key = "ccounter.release.storePassword",
+    localProps = localProps,
+    envKey = "CCOUNTER_RELEASE_STORE_PASSWORD",
+)
+val releaseKeyAlias = resolveConfigValue(
+    key = "ccounter.release.keyAlias",
+    localProps = localProps,
+    envKey = "CCOUNTER_RELEASE_KEY_ALIAS",
+)
+val releaseKeyPassword = resolveConfigValue(
+    key = "ccounter.release.keyPassword",
+    localProps = localProps,
+    envKey = "CCOUNTER_RELEASE_KEY_PASSWORD",
+)
+val hasReleaseSigning = releaseStoreFilePath.isNotBlank() &&
+    releaseStorePassword.isNotBlank() &&
+    releaseKeyAlias.isNotBlank() &&
+    releaseKeyPassword.isNotBlank()
+
 android {
     namespace = "com.example.ccounter"
     compileSdk = 36
@@ -44,9 +82,25 @@ android {
         buildConfigField("String", "GITHUB_REGISTRATION_TOKEN", "\"$registrationToken\"")
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = rootProject.file(releaseStoreFilePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
