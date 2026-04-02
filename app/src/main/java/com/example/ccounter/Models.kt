@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlin.math.roundToInt
 
 @Serializable
 enum class GoalType {
@@ -183,6 +184,12 @@ data class DayStats(
     val fat: Int,
 )
 
+data class DailyMacroTargets(
+    val proteinG: Int,
+    val carbsG: Int,
+    val fatG: Int,
+)
+
 fun calculateDailyCalories(profile: UserProfile): Int {
     val bmr = when (profile.gender) {
         GenderType.FEMALE -> 10.0 * profile.weightKg + 6.25 * profile.heightCm - 5.0 * profile.age - 161
@@ -199,6 +206,20 @@ fun calculateDailyCalories(profile: UserProfile): Int {
         GoalType.GAIN -> 300
     }
     return (bmr * activityMultiplier + adjustment).toInt().coerceAtLeast(1100)
+}
+
+fun calculateDailyMacroTargets(profile: UserProfile): DailyMacroTargets {
+    val calories = profile.dailyTargetCalories.coerceAtLeast(1100)
+    val (proteinRatio, carbsRatio, fatRatio) = when (profile.goal) {
+        GoalType.LOSE -> Triple(0.35, 0.35, 0.30)
+        GoalType.MAINTAIN -> Triple(0.30, 0.40, 0.30)
+        GoalType.GAIN -> Triple(0.25, 0.50, 0.25)
+    }
+    return DailyMacroTargets(
+        proteinG = ((calories * proteinRatio) / 4.0).roundToInt().coerceAtLeast(1),
+        carbsG = ((calories * carbsRatio) / 4.0).roundToInt().coerceAtLeast(1),
+        fatG = ((calories * fatRatio) / 9.0).roundToInt().coerceAtLeast(1),
+    )
 }
 
 fun dayStats(meals: List<MealEntry>, day: LocalDate = LocalDate.now()): DayStats {

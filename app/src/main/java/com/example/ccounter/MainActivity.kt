@@ -1326,6 +1326,9 @@ private fun HomeScreen(
     val scope = rememberCoroutineScope()
     val todayStats = dayStats(meals)
     val target = appData.profile.dailyTargetCalories
+    val macroTargets = remember(appData.profile.dailyTargetCalories, appData.profile.goal) {
+        calculateDailyMacroTargets(appData.profile)
+    }
     var editingMealId by rememberSaveable { mutableStateOf<Long?>(null) }
     var editMealName by rememberSaveable { mutableStateOf("") }
     var editMealDescription by rememberSaveable { mutableStateOf("") }
@@ -1403,10 +1406,27 @@ private fun HomeScreen(
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MacroCard("Protein", "${todayStats.protein}g", Icons.Outlined.LocalFireDepartment, Color(0xFF66BB6A), Modifier.weight(1f))
-                MacroCard("Carbs", "${todayStats.carbs}g", Icons.Default.TextFields, Color(0xFF81C784), Modifier.weight(1f))
-                MacroCard("Fat", "${todayStats.fat}g", Icons.Outlined.WaterDrop, Color(0xFF81C784), Modifier.weight(1f))
+            CardBlock {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MacroProgressRing(
+                        label = "Protein",
+                        consumed = todayStats.protein,
+                        target = macroTargets.proteinG,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MacroProgressRing(
+                        label = "Carbs",
+                        consumed = todayStats.carbs,
+                        target = macroTargets.carbsG,
+                        modifier = Modifier.weight(1f),
+                    )
+                    MacroProgressRing(
+                        label = "Fat",
+                        consumed = todayStats.fat,
+                        target = macroTargets.fatG,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
         item {
@@ -4748,6 +4768,56 @@ private fun MacroCard(label: String, value: String, icon: androidx.compose.ui.gr
             Text(value, color = Color.White, fontWeight = FontWeight.Bold)
             Text(label, color = TextMuted, fontSize = 11.sp)
         }
+    }
+}
+
+@Composable
+private fun MacroProgressRing(
+    label: String,
+    consumed: Int,
+    target: Int,
+    modifier: Modifier = Modifier,
+) {
+    val safeConsumed = consumed.coerceAtLeast(0)
+    val safeTarget = target.coerceAtLeast(1)
+    val progress = (safeConsumed.toFloat() / safeTarget.toFloat()).coerceIn(0f, 1f)
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(label, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier.size(82.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val stroke = 8.dp.toPx()
+                val diameter = size.minDimension - stroke
+                val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+                drawArc(
+                    color = Border,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    topLeft = topLeft,
+                    size = Size(diameter, diameter),
+                )
+                drawArc(
+                    color = Accent,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress,
+                    useCenter = false,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                    topLeft = topLeft,
+                    size = Size(diameter, diameter),
+                )
+            }
+            Text("${safeConsumed}g", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text("/${safeTarget}g", color = TextMuted, fontSize = 11.sp)
     }
 }
 
