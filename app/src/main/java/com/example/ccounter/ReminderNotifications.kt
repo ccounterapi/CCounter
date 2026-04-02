@@ -22,6 +22,7 @@ private const val ACTION_REMINDER = "com.example.ccounter.ACTION_REMINDER"
 private const val EXTRA_REMINDER_TYPE = "extra_reminder_type"
 private const val CHANNEL_DEFAULT = "ccounter_reminders_default"
 private const val WEIGHT_WEEKLY_REQUEST_CODE_BASE = 20_000
+private const val FULL_MEAL_KCAL_THRESHOLD = 300
 
 enum class ReminderType(
     val requestCode: Int,
@@ -38,8 +39,14 @@ class ReminderReceiver : BroadcastReceiver() {
         val typeName = intent.getStringExtra(EXTRA_REMINDER_TYPE) ?: return
         val type = runCatching { ReminderType.valueOf(typeName) }.getOrNull() ?: return
 
-        val settings = AppStorage(context).load().notifications
+        val appData = AppStorage(context).load()
+        val settings = appData.notifications
         if (!ReminderScheduler.shouldSchedule(type, settings)) return
+
+        if (type.isMealType() && hasCompletedMealForToday(appData.meals, type)) {
+            ReminderScheduler.scheduleNext(context, type, settings)
+            return
+        }
 
         ReminderNotifier.show(context, type)
         ReminderScheduler.scheduleNext(context, type, settings)
@@ -455,4 +462,28 @@ private fun WeekDay.toJavaDayOfWeek(): DayOfWeek = when (this) {
     WeekDay.FRI -> DayOfWeek.FRIDAY
     WeekDay.SAT -> DayOfWeek.SATURDAY
     WeekDay.SUN -> DayOfWeek.SUNDAY
+}
+
+private fun ReminderType.isMealType(): Boolean {
+    return this == ReminderType.BREAKFAST || this == ReminderType.LUNCH || this == ReminderType.DINNER
+}
+
+private fun hasCompletedMealForToday(meals: List<MealEntry>, type: ReminderType): Boolean {
+    val zone = ZoneId.systemDefault()
+    val today = Instant.now().atZone(zone).toLocalDate()
+    val mealKcalForPeriod = meals
+        .asSequence()
+        .filter { entry ->
+            val mealTime = Instant.ofEpochMilli(entry.timestamp).atZone(zone)
+            mealTime.toLocalDate() == today && mapHourToReminderType(mealTime.hour) == type
+        }
+        .sumOf { it.totalKcal.coerceAtLeast(0) }
+    return mealKcalForPeriod >= FULL_MEAL_KCAL_THRESHOLD
+}
+
+private fun mapHourToReminderType(hour: Int): ReminderType? = when (hour) {
+    in 5..10 -> ReminderType.BREAKFAST
+    in 11..15 -> ReminderType.LUNCH
+    in 16..21 -> ReminderType.DINNER
+    else -> null
 }
